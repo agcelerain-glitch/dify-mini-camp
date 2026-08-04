@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
@@ -47,6 +47,16 @@ export function PhaseContent({ phase }: Props) {
   const currentLevel = phase.levels.find((l) => l.id === currentLevelId) ?? phase.levels[0];
   const currentPage = currentLevel.pages[currentPageIndex];
   const totalPages = currentLevel.pages.length;
+
+  // ページ切替・レベル切替・リロードのたびに選択肢をシャッフルしてマンネリ防止
+  const shuffledOptions = useMemo(() => {
+    if (currentPage.type !== 'output') return [];
+    const out = currentPage as OutputPage;
+    if (!out.options) return [];
+    return [...out.options].sort(() => Math.random() - 0.5);
+  // currentPage オブジェクト参照ではなくインデックスを依存にして必ず再シャッフル
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPageIndex, currentLevelId]);
   const levelProgress = Math.round(
     ((progress.phases[phase.id]?.levels[currentLevelId]?.clearedPages.length ?? 0) / totalPages) * 100,
   );
@@ -314,6 +324,7 @@ export function PhaseContent({ phase }: Props) {
                 ) : (
                   <OutputPageContent
                     page={currentPage as OutputPage}
+                    shuffledOptions={shuffledOptions}
                     phaseColor={phase.textColor}
                     phaseBorderColor={phase.borderColor}
                     selectedOption={selectedOption}
@@ -538,6 +549,7 @@ function InputPageContent({ page, phaseColor }: { page: InputPage; phaseColor: s
 // ============================================================
 type OutputProps = {
   page: OutputPage;
+  shuffledOptions: { label: string; isCorrect: boolean }[];
   phaseColor: string;
   phaseBorderColor: string;
   selectedOption: number | null;
@@ -557,6 +569,7 @@ type OutputProps = {
 
 function OutputPageContent({
   page,
+  shuffledOptions,
   selectedOption,
   answered,
   shortAnswer,
@@ -582,10 +595,10 @@ function OutputPageContent({
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{page.question}</p>
       </div>
 
-      {/* 選択肢 */}
-      {page.format === 'multiple-choice' && page.options && (
+      {/* 選択肢（shuffledOptions でランダム順表示） */}
+      {page.format === 'multiple-choice' && shuffledOptions.length > 0 && (
         <div className="space-y-2.5">
-          {page.options.map((opt, idx) => {
+          {shuffledOptions.map((opt, idx) => {
             let cls =
               'w-full rounded-xl border p-4 text-left text-sm transition-all ';
             if (!answered) {
@@ -609,14 +622,14 @@ function OutputPageContent({
           {answered && (
             <div
               className={`mt-2 rounded-xl border p-3 text-sm ${
-                page.options[selectedOption ?? 0]?.isCorrect
+                shuffledOptions[selectedOption ?? 0]?.isCorrect
                   ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                   : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
               }`}
             >
-              {page.options[selectedOption ?? 0]?.isCorrect
+              {shuffledOptions[selectedOption ?? 0]?.isCorrect
                 ? '✅ 正解です！次のページへ進みましょう。'
-                : `❌ 不正解。正解は「${page.options.find((o) => o.isCorrect)?.label}」です。もう一度復習してから次へ進みましょう。`}
+                : `❌ 不正解。正解は「${shuffledOptions.find((o) => o.isCorrect)?.label}」です。もう一度復習してから次へ進みましょう。`}
             </div>
           )}
         </div>

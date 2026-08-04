@@ -9,6 +9,7 @@
 
 ### Added
 - 全コードブロックにコピーボタン（`CopyableCodeBlock` コンポーネント）を追加 — クリックで内容をクリップボードへコピー、2秒後に「コピー」表示に戻る
+- **選択肢のランダムシャッフル** — 全フェーズ・全レベルの選択式クイズで、ページ切替・レベル切替・リロードのたびに選択肢の並び順をランダム化。`useMemo([currentPageIndex, currentLevelId])` で制御し、正解が常に1番目に固定されるマンネリを解消
 - **Phase 2 Level 2「LLMのAPI接続 — Geminiで無料利用」を新規追加**（5ページ構成）
   - P1 インプット: LLMブロックとAPIキーの仕組み（Difyクレジット問題・Geminiの無料枠を解説）
   - P2 インプット: Google AI Studio（aistudio.google.com）でのGemini APIキー取得手順
