@@ -9,6 +9,18 @@
 
 ---
 
+## [0.4.1] - 2026-08-04
+
+### Fixed
+- **DBスキーマの冪等化** — `01_users.sql` / `02_progress.sql` ともにポリシーを `DROP POLICY IF EXISTS → CREATE POLICY` パターンに変更し、何度実行してもエラーにならない設計に修正
+- `01_users.sql` のトリガーを `CREATE OR REPLACE TRIGGER` から `DROP TRIGGER IF EXISTS → CREATE TRIGGER` に変更（より明示的な冪等化）
+- `02_progress.sql` の `phase_id` / `current_phase` のCHECK制約から `BETWEEN 1 AND 5` を除去し、他プロジェクトでもそのまま再利用できる汎用設計に変更
+
+### Changed
+- `database/schema/README.md` を全面改訂 — 冪等性の仕組み・再利用方法・テーブル構造をまとめた完全版ドキュメントに更新
+
+---
+
 ## [0.4.0] - 2026-08-04
 
 ### Added
