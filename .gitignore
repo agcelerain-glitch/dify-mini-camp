@@ -1,0 +1,32 @@
+# 環境変数（絶対にコミットしない）
+.env
+.env.local
+.env.*.local
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+front/.next/
+front/out/
+front/build/
+
+# Vercel
+.vercel
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 機密情報（絶対にコミットしない）
+other/client_secret_*.json
+other/memo.txt
