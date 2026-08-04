@@ -24,6 +24,12 @@ export function PhaseContent({ phase }: Props) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // ページ/レベル切替時にスクロールトップ
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPageIndex, currentLevelId]);
+
   // クイズ/アウトプット用状態
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
@@ -217,6 +223,7 @@ export function PhaseContent({ phase }: Props) {
 
         {/* ===== メインコンテンツ ===== */}
         <div ref={contentRef} className="flex-1 overflow-y-auto">
+          <div id="page-top" />
           {/* モバイルレベル切替 */}
           <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto border-b border-white/10 bg-slate-950/95 px-4 py-2 lg:hidden">
             {phase.levels.map((level) => (
