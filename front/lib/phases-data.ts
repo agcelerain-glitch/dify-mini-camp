@@ -497,7 +497,7 @@ const PHASE2: Phase = {
   title: '変数とプロンプトエンジニアリング',
   subtitle: 'Phase 2',
   difficultyLabel: '初中級',
-  duration: '1.5時間',
+  duration: '2時間',
   bgGradient: 'from-blue-500/20 to-blue-600/10',
   borderColor: 'border-blue-500/40',
   textColor: 'text-blue-400',
@@ -742,8 +742,206 @@ AIに特定のキャラクターや専門家を演じさせます。
         },
       ],
     },
+    // ---- Level 2 ----
     {
       id: 2,
+      title: 'LLMのAPI接続 — Geminiで無料利用',
+      description: 'DifyのクレジットなしでAIを動かすGemini APIキーを取得・連携する',
+      estimatedTime: '30分',
+      pages: [
+        {
+          id: 1,
+          type: 'input',
+          title: 'LLMブロックとAPIキーの仕組み',
+          content: `## LLMブロックにはAPIキーが必要
+
+Difyのワークフローで使う「LLMブロック」は、内部でAIモデル（GPT-4o、Gemini、Claudeなど）を呼び出しています。そのためには**APIキー**が必要です。
+
+---
+
+## Difyの無料クレジットとは
+
+Difyには新規登録時に**無料クレジット（約$5相当）**が付与されます。このクレジットはDifyのデフォルトAIモデル（主にOpenAIのGPT系）を使うたびに消費されます。
+
+### ⚠️ 注意点
+- クレジットは学習中にすぐ消費されることがある
+- クレジットが切れるとLLMブロックが動かなくなる
+- 追加クレジットは有料
+
+---
+
+## 解決策：自分でAPIキーを用意する
+
+DifyのLLMブロックでは、**自分のAPIキーを設定するとDifyのクレジットを消費しません。**
+
+つまり、無料のAPIキーを持つモデルを使えば、**ずっと無料でDifyを動かせます！**
+
+---
+
+## Gemini APIは無料で使える
+
+**Google Gemini**は、Google AI Studio経由で**無料のAPIキーを発行**しています。
+
+| 項目 | 内容 |
+|------|------|
+| APIキー | 無料で取得可能 |
+| 無料枠 | Gemini 1.5 Flashなら1分15リクエスト・1日1,500リクエスト |
+| 品質 | 学習・開発用途に十分な性能 |
+| Difyとの相性 | 公式サポート済み |
+
+次のページで実際にAPIキーを取得してみましょう。`,
+          keyPoints: [
+            'LLMブロックはAIモデルのAPIキーを使って動作する',
+            'Difyの無料クレジットは消費されると追加費用が必要',
+            '自分のGemini APIキーを設定すればDifyクレジットを消費しない',
+          ],
+        },
+        {
+          id: 2,
+          type: 'input',
+          title: 'Google AI StudioでGemini APIキーを取得しよう',
+          content: `## Google AI Studio でAPIキーを取得する
+
+### Step 1: Google AI Studioにアクセス
+
+ブラウザで **[aistudio.google.com](https://aistudio.google.com)** を開いてください。
+
+Googleアカウントでサインインします（Gmailアカウントがあれば使えます）。
+
+---
+
+### Step 2: 左メニューから「Get API key」を選ぶ
+
+ログイン後、**画面左側のサイドバー**に「**Get API key**」というリンクがあります。クリックしてください。
+
+> 💡 左サイドバーに表示されているはずです。見当たらない場合はメニューアイコン（☰）で展開できます。
+
+---
+
+### Step 3: APIキーを作成する
+
+「Get API key」ページが開きます。
+
+1. 「**Create API key**」ボタンをクリック
+2. プロジェクトを選択（または「Search for a project」で適当なプロジェクトを選ぶ）
+3. APIキーが生成されます
+
+---
+
+### Step 4: APIキーをコピーして保管する
+
+生成されたAPIキーは **「AIzaSy...」** で始まる長い文字列です。
+
+\`\`\`
+例: AIzaSyBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+\`\`\`
+
+⚠️ **このキーは他人に見せないようにしてください。**
+
+「**コピー**」ボタンでクリップボードに保存し、メモ帳などに一時保存しておきましょう。
+
+---
+
+### 無料枠について
+
+| モデル | 無料枠（1分） | 無料枠（1日） |
+|--------|-------------|-------------|
+| Gemini 1.5 Flash | 15リクエスト | 1,500リクエスト |
+| Gemini 1.5 Pro | 2リクエスト | 50リクエスト |
+| Gemini 2.0 Flash | 15リクエスト | 1,500リクエスト |
+
+学習目的なら **Gemini 1.5 Flash** または **Gemini 2.0 Flash** が最適です。`,
+          keyPoints: [
+            'aistudio.google.comにGoogleアカウントでログイン',
+            '左サイドバーの「Get API key」からAPIキーを作成',
+            'AIzaSy...で始まるキーをコピーして安全に保管する',
+          ],
+        },
+        {
+          id: 3,
+          type: 'input',
+          title: 'DifyにGemini APIを連携しよう',
+          content: `## DifyにGemini APIキーを設定する
+
+取得したGemini APIキーをDifyに登録することで、LLMブロックでGeminiが使えるようになります。
+
+---
+
+### Step 1: Difyの設定を開く
+
+1. Difyにログイン（[cloud.dify.ai](https://cloud.dify.ai)）
+2. **右上のユーザーアイコン**をクリック
+3. **「設定」** を選択
+
+---
+
+### Step 2: モデルプロバイダーを選ぶ
+
+設定画面で **「モデルプロバイダー」**（または「Model Provider」）を選択します。
+
+利用可能なAIプロバイダーの一覧が表示されます。
+
+---
+
+### Step 3: Googleを選んでAPIキーを入力
+
+1. 一覧から **「Google」** を探してクリック
+2. 「**APIキー**」の入力欄に、先ほど取得した **AIzaSy...** のキーを貼り付ける
+3. 「**保存**」ボタンをクリック
+
+> ✅ 保存後、「接続済み」または緑のチェックマークが表示されれば成功です！
+
+---
+
+### Step 4: LLMブロックでGeminiを選択する
+
+これまでのワークフローを開き、LLMブロックをクリックします。
+
+1. 「**モデル**」のプルダウンをクリック
+2. **「Google」** → **「gemini-1.5-flash」** または **「gemini-2.0-flash」** を選択
+3. 設定を保存
+
+---
+
+### テストしてみよう
+
+デバッグモードでワークフローを実行して、Geminiが正常に返答するか確認しましょう。
+
+> 💡 **Geminiを選んだLLMブロックはDifyのクレジットを消費しません！**
+> 学習中はGeminiを使うことで、コストを気にせず自由に試せます。`,
+          keyPoints: [
+            'Dify設定 → モデルプロバイダー → Google からAPIキーを登録',
+            'LLMブロックのモデル選択でGeminiを指定する',
+            'Gemini使用中はDifyの無料クレジットが消費されない',
+          ],
+        },
+        {
+          id: 4,
+          type: 'output',
+          title: '確認クイズ：Gemini API活用の利点',
+          question: 'DifyのLLMブロックに自分のGemini APIキーを設定したときの説明として正しいものはどれですか？',
+          format: 'multiple-choice',
+          options: [
+            { label: 'Difyの無料クレジットを消費せず、Geminiの無料枠でAIを使える', isCorrect: true },
+            { label: 'Gemini APIキーを使うと、Difyの有料プランに自動でアップグレードされる', isCorrect: false },
+            { label: 'Gemini APIはDifyのクレジットを2倍消費する', isCorrect: false },
+            { label: 'APIキーの設定は不要で、DifyがGeminiに自動接続してくれる', isCorrect: false },
+          ],
+          hint: '自分のAPIキーを設定するとDifyのクレジットを使わず、各プロバイダーの無料枠を直接利用できます。',
+        },
+        {
+          id: 5,
+          type: 'output',
+          title: '課題提出：Gemini APIキー連携の実施報告',
+          question: 'Google AI StudioでGemini APIキーを取得し、DifyのモデルプロバイダーにGoogleのAPIキーを登録しましたか？\n\nAIメンターに以下を教えてください：\n① Google AI Studioでのキー取得はスムーズにできましたか？\n② DifyのLLMブロックでGeminiモデルを選択し、テスト実行できましたか？\n③ Geminiを使ってみた感想を教えてください！',
+          format: 'chat',
+          hint: 'まだAPIキーを取得できていない場合は、どのステップで詰まっているかをAIメンターに相談してください。一緒に解決しましょう！',
+        },
+      ],
+    },
+    // ---- Level 3 (旧Level 2) ----
+    {
+      id: 3,
       title: '高度なプロンプト設計',
       description: 'システムプロンプトの構造化とテンプレートブロックの活用',
       estimatedTime: '45分',

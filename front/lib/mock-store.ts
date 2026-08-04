@@ -56,6 +56,7 @@ function makeDefaultPhaseProgress(): PhaseProgress {
     levels: {
       1: { currentPage: 1, clearedPages: [] },
       2: { currentPage: 1, clearedPages: [] },
+      3: { currentPage: 1, clearedPages: [] },
     },
   };
 }

@@ -39,6 +39,7 @@ export default function HomePage() {
 
   const clearedPhases = PHASES.filter((p) => isPhaseCleared(p.id)).length;
   const totalProgress = Math.round((clearedPhases / PHASES.length) * 100);
+  const isMaster = totalProgress === 100;
   const currentPhase = progress.currentPhase;
   const currentPhaseData = PHASES.find((p) => p.id === currentPhase);
   const currentLevel = progress.phases[currentPhase]?.currentLevel ?? 1;
@@ -55,7 +56,11 @@ export default function HomePage() {
             <div>
               <p className="text-sm text-slate-400">おかえりなさい</p>
               <h1 className="mt-1 text-2xl font-bold text-white">{user.name} さん</h1>
-              {currentPhaseData && (
+              {isMaster ? (
+                <p className="mt-2 text-slate-300">
+                  <span className="font-semibold text-yellow-400">🏆 チャットボットマスター</span> として全フェーズ制覇！
+                </p>
+              ) : currentPhaseData && (
                 <p className="mt-2 text-slate-300">
                   現在{' '}
                   <span className={`font-semibold ${currentPhaseData.textColor}`}>
@@ -76,8 +81,28 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 現在の学習 */}
-        {currentPhaseData && currentLevelData && (
+        {/* チャットボットマスター / 現在の学習 */}
+        {isMaster ? (
+          <div className="mb-8 rounded-2xl border border-yellow-500/40 bg-gradient-to-br from-yellow-500/20 to-amber-600/10 p-6">
+            <Badge className="mb-3 bg-yellow-500/20 text-yellow-300">
+              🏆 チャットボットマスター
+            </Badge>
+            <h2 className="text-xl font-bold text-white">全フェーズ修了、おめでとうございます！</h2>
+            <p className="mt-2 text-slate-300">どのフェーズを復習する？</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {PHASES.map((phase) => (
+                <Link key={phase.id} href={`/camp/${phase.id}`}>
+                  <Button
+                    variant="outline"
+                    className={`w-full border ${phase.borderColor} ${phase.textColor} bg-slate-900 hover:bg-slate-800`}
+                  >
+                    {phase.icon} Phase {phase.id}
+                  </Button>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : currentPhaseData && currentLevelData && (
           <div className={`mb-8 rounded-2xl border ${currentPhaseData.borderColor} bg-gradient-to-br ${currentPhaseData.bgGradient} p-6`}>
             <Badge className={`mb-3 ${currentPhaseData.badgeBg}`}>
               {currentPhaseData.icon} 現在学習中
