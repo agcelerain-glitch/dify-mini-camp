@@ -14,13 +14,11 @@ import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
-  const { progress, isPhaseUnlocked, isPhaseCleared, resetAll } = useProgress();
+  const { progress, isPhaseCleared, isLevelCleared, resetAll } = useProgress();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace('/');
-    }
+    if (!isLoading && !user) router.replace('/');
   }, [user, isLoading, router]);
 
   if (isLoading || !user) {
@@ -31,149 +29,144 @@ export default function HomePage() {
     );
   }
 
-  const currentPhase = progress.currentPhase;
-  const currentPhaseData = PHASES.find((p) => p.id === currentPhase);
-  const clearedCount = PHASES.filter((p) => isPhaseCleared(p.id)).length;
-  const totalProgress = Math.round((clearedCount / PHASES.length) * 100);
-
-  function getCurrentLevel(): number {
-    return progress.phases[currentPhase]?.currentLevel ?? 1;
-  }
-
-  function getLevelProgress(phaseId: number): number {
+  function getPhaseProgress(phaseId: number): number {
     const phase = PHASES.find((p) => p.id === phaseId);
     if (!phase) return 0;
-    const cleared = progress.phases[phaseId]?.clearedLevels.length ?? 0;
-    return Math.round((cleared / phase.levels.length) * 100);
+    const totalLevels = phase.levels.length;
+    const clearedLevels = phase.levels.filter((l) => isLevelCleared(phaseId, l.id)).length;
+    return Math.round((clearedLevels / totalLevels) * 100);
   }
+
+  const clearedPhases = PHASES.filter((p) => isPhaseCleared(p.id)).length;
+  const totalProgress = Math.round((clearedPhases / PHASES.length) * 100);
+  const currentPhase = progress.currentPhase;
+  const currentPhaseData = PHASES.find((p) => p.id === currentPhase);
+  const currentLevel = progress.phases[currentPhase]?.currentLevel ?? 1;
+  const currentLevelData = currentPhaseData?.levels.find((l) => l.id === currentLevel);
 
   return (
     <div className="min-h-screen bg-slate-950">
       <Navbar />
 
       <main className="mx-auto max-w-5xl px-4 py-8">
+        {/* ウェルカムカード */}
         <div className="mb-8 rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-600/20 to-violet-600/10 p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-sm text-slate-400">おかえりなさい</p>
               <h1 className="mt-1 text-2xl font-bold text-white">{user.name} さん</h1>
-              <p className="mt-2 text-slate-300">
-                現在{' '}
-                <span className={`font-semibold ${currentPhaseData?.textColor}`}>
-                  Phase {currentPhase}
-                </span>
-                {' '}を学習中
-              </p>
+              {currentPhaseData && (
+                <p className="mt-2 text-slate-300">
+                  現在{' '}
+                  <span className={`font-semibold ${currentPhaseData.textColor}`}>
+                    Phase {currentPhase} — Level {currentLevel}
+                  </span>
+                  {' '}を学習中
+                </p>
+              )}
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-500">総合進捗</p>
+              <p className="text-xs text-slate-500">全体進捗</p>
               <p className="text-3xl font-bold text-white">{totalProgress}%</p>
-              <p className="text-xs text-slate-500">{clearedCount} / {PHASES.length} フェーズ完了</p>
+              <p className="text-xs text-slate-500">{clearedPhases} / {PHASES.length} フェーズ完了</p>
             </div>
           </div>
-
           <div className="mt-4">
             <Progress value={totalProgress} className="h-2 bg-slate-700" />
           </div>
         </div>
 
-        {currentPhaseData && (
+        {/* 現在の学習 */}
+        {currentPhaseData && currentLevelData && (
           <div className={`mb-8 rounded-2xl border ${currentPhaseData.borderColor} bg-gradient-to-br ${currentPhaseData.bgGradient} p-6`}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <Badge className={`mb-2 ${currentPhaseData.badgeBg}`}>
-                  {currentPhaseData.icon} 現在学習中
-                </Badge>
-                <h2 className="text-xl font-bold text-white">
-                  Phase {currentPhase}: {currentPhaseData.title}
-                </h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  レベル {getCurrentLevel()} / {currentPhaseData.levels.length} |{' '}
-                  推奨時間: {currentPhaseData.duration}
-                </p>
-                <p className="mt-2 text-slate-300">{currentPhaseData.description}</p>
+            <Badge className={`mb-3 ${currentPhaseData.badgeBg}`}>
+              {currentPhaseData.icon} 現在学習中
+            </Badge>
+            <h2 className="text-xl font-bold text-white">
+              Phase {currentPhase}: {currentPhaseData.title}
+            </h2>
+            <p className={`mt-0.5 text-sm ${currentPhaseData.textColor}`}>
+              Level {currentLevel}: {currentLevelData.title}
+            </p>
+            <p className="mt-2 text-sm text-slate-400">{currentLevelData.description}</p>
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="mb-1 flex justify-between text-xs text-slate-400">
+                  <span>Level進捗</span>
+                  <span>{getPhaseProgress(currentPhase)}%</span>
+                </div>
+                <Progress value={getPhaseProgress(currentPhase)} className="h-1.5 bg-slate-700/50" />
               </div>
               <Link href={`/camp/${currentPhase}`}>
                 <Button className="bg-indigo-600 hover:bg-indigo-500 whitespace-nowrap">
-                  学習を続ける →
+                  続ける →
                 </Button>
               </Link>
-            </div>
-            <div className="mt-4">
-              <div className="mb-1 flex justify-between text-xs text-slate-400">
-                <span>フェーズ進捗</span>
-                <span>{getLevelProgress(currentPhase)}%</span>
-              </div>
-              <Progress value={getLevelProgress(currentPhase)} className="h-1.5 bg-slate-700/50" />
             </div>
           </div>
         )}
 
+        {/* ロードマップ */}
         <div className="mb-6">
-          <h3 className="mb-4 text-lg font-semibold text-white">ロードマップ</h3>
+          <h3 className="mb-4 text-lg font-semibold text-white">学習ロードマップ</h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PHASES.map((phase) => {
-              const unlocked = isPhaseUnlocked(phase.id);
               const cleared = isPhaseCleared(phase.id);
               const isCurrent = phase.id === currentPhase;
-              const levelPct = getLevelProgress(phase.id);
+              const pct = getPhaseProgress(phase.id);
 
               return (
                 <Link
                   key={phase.id}
-                  href={unlocked ? `/camp/${phase.id}` : '#'}
-                  className={`relative rounded-xl border p-4 transition-all ${
-                    unlocked
-                      ? `${phase.borderColor} bg-slate-900 hover:bg-slate-800 cursor-pointer`
-                      : 'border-white/5 bg-slate-900/30 cursor-not-allowed opacity-40'
-                  } ${isCurrent ? 'ring-1 ring-indigo-500/50' : ''}`}
+                  href={`/camp/${phase.id}`}
+                  className={`relative rounded-xl border p-4 transition-all cursor-pointer ${
+                    phase.borderColor
+                  } bg-slate-900 hover:bg-slate-800 ${isCurrent ? 'ring-1 ring-indigo-500/50' : ''}`}
                 >
                   {cleared && (
                     <span className="absolute right-3 top-3 text-lg">✅</span>
-                  )}
-                  {!unlocked && (
-                    <span className="absolute right-3 top-3 text-lg">🔒</span>
                   )}
                   <p className="mb-1 text-xs text-slate-500">{phase.subtitle}</p>
                   <p className="font-semibold text-white">
                     {phase.icon} {phase.title}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
-                    <Badge className={`text-xs ${phase.badgeBg}`}>
-                      {phase.difficultyLabel}
-                    </Badge>
+                    <Badge className={`text-xs ${phase.badgeBg}`}>{phase.difficultyLabel}</Badge>
                     <span className="text-xs text-slate-500">{phase.duration}</span>
                   </div>
-                  {unlocked && !cleared && (
-                    <div className="mt-3">
-                      <Progress value={levelPct} className="h-1 bg-slate-700" />
+                  <div className="mt-3">
+                    <div className="mb-0.5 flex justify-between text-xs text-slate-600">
+                      <span>{phase.levels.length} レベル</span>
+                      <span>{pct}%</span>
                     </div>
-                  )}
+                    <Progress value={pct} className="h-1 bg-slate-700" />
+                  </div>
                 </Link>
               );
             })}
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/5 bg-slate-900/50 p-4">
-          <h4 className="mb-3 text-sm font-semibold text-slate-400">学習の進め方</h4>
+        {/* 学習の進め方 */}
+        <div className="rounded-xl border border-white/5 bg-slate-900/50 p-5">
+          <h4 className="mb-3 text-sm font-semibold text-slate-300">学習の進め方</h4>
           <ol className="space-y-2 text-sm text-slate-500">
-            <li>1. <span className="text-slate-300">インプット</span>ページでDifyの概念・操作を学ぶ</li>
-            <li>2. <span className="text-slate-300">実際にDifyを操作</span>して課題をこなす</li>
-            <li>3. <span className="text-slate-300">アウトプット</span>ページで理解度を確認（レベルアップ）</li>
-            <li>4. 全レベルクリアで次のフェーズが解放される</li>
+            <li><span className="text-slate-300">1. インプット</span> — 各ページでDifyの概念・操作を学ぶ</li>
+            <li><span className="text-slate-300">2. 実践</span> — 実際にDifyを操作して課題に取り組む</li>
+            <li><span className="text-slate-300">3. アウトプット</span> — クイズ・チャットで理解を確認（ページクリア）</li>
+            <li><span className="text-slate-300">4. レベルアップ</span> — 全ページクリアで次のレベルへ</li>
           </ol>
           <div className="mt-4 flex gap-2">
             <Link href="/camp">
               <Button variant="outline" size="sm" className="border-white/10 text-slate-300 hover:bg-white/5">
-                キャンプへ移動
+                キャンプへ
               </Button>
             </Link>
             <Button
               variant="ghost"
               size="sm"
               onClick={resetAll}
-              className="text-xs text-slate-600 hover:text-slate-400"
+              className="text-xs text-slate-700 hover:text-slate-400"
             >
               進捗リセット（テスト用）
             </Button>

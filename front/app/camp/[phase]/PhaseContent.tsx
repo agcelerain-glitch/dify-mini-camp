@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProgress } from '@/contexts/ProgressContext';
-import { Phase, InputLevel, OutputLevel } from '@/lib/phases-data';
-import { PHASES } from '@/lib/phases-data';
+import { Phase, Level, InputPage, OutputPage, Page } from '@/lib/phases-data';
 import { Navbar } from '@/components/Navbar';
 import { ChatbotButton } from '@/components/ChatbotButton';
 import { Badge } from '@/components/ui/badge';
@@ -18,74 +17,65 @@ type Props = { phase: Phase };
 
 export function PhaseContent({ phase }: Props) {
   const { user, isLoading } = useAuth();
-  const { progress, isPhaseUnlocked, isLevelCleared, completeLevel, completePhase } = useProgress();
+  const { progress, isLevelCleared, isPageCleared, completePage, completeLevel } = useProgress();
   const router = useRouter();
 
-  const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
+  const [currentLevelId, setCurrentLevelId] = useState(1);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // クイズ/アウトプット用状態
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
   const [shortAnswer, setShortAnswer] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [showHint, setShowHint] = useState(false);
-  const [phaseComplete, setPhaseComplete] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace('/');
-    }
+    if (!isLoading && !user) router.replace('/');
   }, [user, isLoading, router]);
 
-  useEffect(() => {
-    const savedLevel = (progress.phases[phase.id]?.currentLevel ?? 1) - 1;
-    setCurrentLevelIndex(Math.max(0, Math.min(savedLevel, phase.levels.length - 1)));
-  }, [phase.id, phase.levels.length, progress.phases]);
+  const currentLevel = phase.levels.find((l) => l.id === currentLevelId) ?? phase.levels[0];
+  const currentPage = currentLevel.pages[currentPageIndex];
+  const totalPages = currentLevel.pages.length;
+  const levelProgress = Math.round(
+    ((progress.phases[phase.id]?.levels[currentLevelId]?.clearedPages.length ?? 0) / totalPages) * 100,
+  );
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-      </div>
-    );
+  function scrollTop() {
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  if (!isPhaseUnlocked(phase.id)) {
-    return (
-      <div className="min-h-screen bg-slate-950">
-        <Navbar />
-        <div className="flex flex-col items-center justify-center py-32 text-center">
-          <p className="mb-4 text-6xl">🔒</p>
-          <h2 className="text-xl font-bold text-white">フェーズがロックされています</h2>
-          <p className="mt-2 text-slate-400">前のフェーズをクリアすると解放されます。</p>
-          <Link href="/camp">
-            <Button className="mt-6 bg-indigo-600 hover:bg-indigo-500">キャンプに戻る</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const currentLevel = phase.levels[currentLevelIndex];
-  const levelProgress = Math.round(((currentLevelIndex) / phase.levels.length) * 100);
-  const isLastLevel = currentLevelIndex === phase.levels.length - 1;
-  const isCurrentLevelCleared = isLevelCleared(phase.id, currentLevel.id);
-
-  function goToLevel(index: number) {
-    setCurrentLevelIndex(index);
+  function resetPageState() {
     setSelectedOption(null);
     setAnswered(false);
     setShortAnswer('');
-    setShowHint(false);
     setChatInput('');
+    setChatMessages([]);
+    setShowHint(false);
   }
 
-  function handleNextLevel() {
-    completeLevel(phase.id, currentLevel.id);
-    if (isLastLevel) {
-      completePhase(phase.id);
-      setPhaseComplete(true);
+  function goToLevel(levelId: number) {
+    setCurrentLevelId(levelId);
+    setCurrentPageIndex(0);
+    resetPageState();
+    scrollTop();
+  }
+
+  function goToPage(index: number) {
+    setCurrentPageIndex(index);
+    resetPageState();
+    scrollTop();
+  }
+
+  function handleNext() {
+    completePage(phase.id, currentLevelId, currentPage.id);
+    if (currentPageIndex < totalPages - 1) {
+      goToPage(currentPageIndex + 1);
     } else {
-      goToLevel(currentLevelIndex + 1);
+      completeLevel(phase.id, currentLevelId);
     }
   }
 
@@ -102,191 +92,280 @@ export function PhaseContent({ phase }: Props) {
 
   function handleChatSend() {
     if (!chatInput.trim()) return;
-    const userMsg = chatInput.trim();
+    const text = chatInput.trim();
     setChatInput('');
-    setChatMessages((prev) => [...prev, { role: 'user', text: userMsg }]);
+    setChatMessages((prev) => [...prev, { role: 'user', text }]);
+    setIsTyping(true);
     setTimeout(() => {
-      const reply = generateMockChatReply(userMsg, phase.id, currentLevel.id);
+      const reply = mockMentorReply(text, phase.id, currentLevelId, currentPage.id);
       setChatMessages((prev) => [...prev, { role: 'assistant', text: reply }]);
-    }, 800);
+      setIsTyping(false);
+    }, 800 + Math.random() * 600);
   }
 
-  if (phaseComplete) {
-    const nextPhase = PHASES.find((p) => p.id === phase.id + 1);
+  const canProceed: boolean = (() => {
+    if (currentPage.type === 'input') return true;
+    const out = currentPage as OutputPage;
+    if (out.format === 'multiple-choice') return answered;
+    if (out.format === 'short-answer') return answered;
+    if (out.format === 'chat') return chatMessages.length > 0;
+    return false;
+  })();
+
+  if (isLoading || !user) {
     return (
-      <div className="min-h-screen bg-slate-950">
-        <Navbar />
-        <div className="flex flex-col items-center justify-center py-24 text-center px-4">
-          <p className="mb-4 text-6xl">🎉</p>
-          <h2 className="text-2xl font-bold text-white">Phase {phase.id} クリア！</h2>
-          <p className="mt-2 text-slate-400 max-w-md">
-            {phase.title}を完了しました。{phase.icon} おめでとうございます！
-          </p>
-          <div className="mt-8 flex gap-3">
-            {nextPhase ? (
-              <Link href={`/camp/${nextPhase.id}`}>
-                <Button className="bg-indigo-600 hover:bg-indigo-500">
-                  Phase {nextPhase.id} へ進む →
-                </Button>
-              </Link>
-            ) : (
-              <p className="text-slate-300 font-semibold">全フェーズ制覇！素晴らしい！</p>
-            )}
-            <Link href="/home">
-              <Button variant="outline" className="border-white/10 text-slate-300 hover:bg-white/5">
-                ホームへ
-              </Button>
-            </Link>
-          </div>
-        </div>
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
       </div>
     );
   }
 
+  const phaseAllClearedLevels = Object.values(progress.phases[phase.id]?.levels ?? {}).filter(
+    (l) => l.clearedAt,
+  ).length;
+  const phaseProgress = Math.round((phaseAllClearedLevels / phase.levels.length) * 100);
+
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="flex min-h-screen flex-col bg-slate-950">
       <Navbar />
-      <div className="mx-auto flex max-w-6xl gap-0 px-0 lg:px-4 py-0 lg:py-8 lg:gap-6">
-        <aside className="hidden lg:flex w-64 shrink-0 flex-col">
-          <div className={`rounded-2xl border ${phase.borderColor} bg-slate-900 p-4 sticky top-20`}>
-            <p className="mb-1 text-xs text-slate-500">{phase.subtitle}</p>
-            <h2 className={`text-sm font-bold ${phase.textColor}`}>{phase.title}</h2>
-            <div className="mt-3 mb-4">
-              <div className="flex justify-between text-xs text-slate-500 mb-1">
-                <span>進捗</span>
-                <span>{levelProgress}%</span>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* ===== 左サイドバー ===== */}
+        <aside className="hidden w-64 shrink-0 overflow-y-auto border-r border-white/10 lg:block">
+          <div className="p-4">
+            <Link href="/camp" className="mb-4 flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300">
+              ← キャンプに戻る
+            </Link>
+
+            <div className="mb-4">
+              <p className="text-xs text-slate-500">{phase.subtitle}</p>
+              <h2 className={`text-sm font-bold ${phase.textColor}`}>{phase.title}</h2>
+              <div className="mt-2">
+                <div className="mb-1 flex justify-between text-xs text-slate-600">
+                  <span>フェーズ進捗</span>
+                  <span>{phaseProgress}%</span>
+                </div>
+                <Progress value={phaseProgress} className="h-1 bg-slate-800" />
               </div>
-              <Progress value={levelProgress} className="h-1.5 bg-slate-700" />
             </div>
 
-            <div className="space-y-1">
-              {phase.levels.map((level, idx) => {
-                const cleared = isLevelCleared(phase.id, level.id);
-                const isCurr = idx === currentLevelIndex;
+            <div className="space-y-2">
+              {phase.levels.map((level) => {
+                const lCleared = isLevelCleared(phase.id, level.id);
+                const lActive = level.id === currentLevelId;
+                const lPageCount = level.pages.length;
+                const lClearedPages =
+                  progress.phases[phase.id]?.levels[level.id]?.clearedPages.length ?? 0;
+                const lPct = Math.round((lClearedPages / lPageCount) * 100);
+
                 return (
-                  <button
-                    key={level.id}
-                    onClick={() => goToLevel(idx)}
-                    className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                      isCurr
-                        ? `${phase.textColor} bg-slate-800 font-medium`
-                        : cleared
-                        ? 'text-slate-400 hover:bg-slate-800'
-                        : 'text-slate-600 hover:bg-slate-800/50'
-                    }`}
-                  >
-                    <span className="mr-2">{cleared ? '✅' : level.type === 'input' ? '📖' : '✏️'}</span>
-                    {level.title}
-                  </button>
+                  <div key={level.id}>
+                    <button
+                      onClick={() => goToLevel(level.id)}
+                      className={`w-full rounded-xl p-3 text-left transition-colors ${
+                        lActive
+                          ? `${phase.borderColor} border bg-slate-800`
+                          : 'border border-transparent hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${lActive ? phase.textColor : 'text-slate-500'}`}>
+                          Level {level.id}
+                        </span>
+                        {lCleared && <span className="ml-auto text-xs">✅</span>}
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-400 line-clamp-2">{level.title}</p>
+                      <div className="mt-2">
+                        <Progress value={lPct} className="h-0.5 bg-slate-700" />
+                      </div>
+                    </button>
+
+                    {lActive && (
+                      <div className="ml-2 mt-1 space-y-0.5 border-l border-white/10 pl-3">
+                        {level.pages.map((page, idx) => {
+                          const pCleared = isPageCleared(phase.id, level.id, page.id);
+                          const pActive = idx === currentPageIndex;
+                          return (
+                            <button
+                              key={page.id}
+                              onClick={() => goToPage(idx)}
+                              className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${
+                                pActive
+                                  ? `${phase.textColor} bg-slate-800 font-medium`
+                                  : pCleared
+                                  ? 'text-slate-400 hover:bg-slate-800'
+                                  : 'text-slate-600 hover:bg-slate-800/50'
+                              }`}
+                            >
+                              <span>
+                                {pCleared ? '✅' : page.type === 'input' ? '📖' : '✏️'}
+                              </span>
+                              <span className="line-clamp-1">
+                                P{page.id}. {page.title}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <p className="text-xs text-slate-500 mb-2">ゴール</p>
-              <p className="text-xs text-slate-400">{phase.goal}</p>
             </div>
           </div>
         </aside>
 
-        <div className="flex-1 min-w-0">
-          <div className="mb-4 flex items-center gap-2 px-4 lg:px-0">
-            <Link href="/camp" className="text-xs text-slate-500 hover:text-slate-300">
-              ← キャンプ
-            </Link>
-            <span className="text-slate-700">/</span>
-            <span className="text-xs text-slate-400">Phase {phase.id}</span>
-            <span className="text-slate-700">/</span>
-            <span className="text-xs text-slate-300">Lv.{currentLevel.id}</span>
+        {/* ===== メインコンテンツ ===== */}
+        <div ref={contentRef} className="flex-1 overflow-y-auto">
+          {/* モバイルレベル切替 */}
+          <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto border-b border-white/10 bg-slate-950/95 px-4 py-2 lg:hidden">
+            {phase.levels.map((level) => (
+              <button
+                key={level.id}
+                onClick={() => goToLevel(level.id)}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border ${
+                  level.id === currentLevelId
+                    ? `${phase.borderColor} ${phase.textColor} bg-slate-800`
+                    : 'border-white/10 text-slate-500'
+                }`}
+              >
+                {isLevelCleared(phase.id, level.id) ? '✅ ' : ''}Lv.{level.id}
+              </button>
+            ))}
           </div>
 
-          <div className="lg:hidden mb-4 px-4 flex gap-2 overflow-x-auto pb-2">
-            {phase.levels.map((level, idx) => {
-              const cleared = isLevelCleared(phase.id, level.id);
-              return (
-                <button
-                  key={level.id}
-                  onClick={() => goToLevel(idx)}
-                  className={`shrink-0 rounded-lg px-3 py-1.5 text-xs border transition-colors ${
-                    idx === currentLevelIndex
-                      ? `${phase.borderColor} ${phase.textColor} bg-slate-800`
-                      : cleared
-                      ? 'border-white/10 text-slate-400'
-                      : 'border-white/5 text-slate-600'
-                  }`}
-                >
-                  {cleared ? '✅' : level.type === 'input' ? '📖' : '✏️'} Lv.{level.id}
-                </button>
-              );
-            })}
-          </div>
+          <div className="mx-auto max-w-3xl px-4 py-6">
+            {/* パンくず */}
+            <div className="mb-4 flex items-center gap-1.5 text-xs text-slate-500">
+              <Link href="/camp" className="hover:text-slate-300">キャンプ</Link>
+              <span>/</span>
+              <span>{phase.subtitle}</span>
+              <span>/</span>
+              <span className={phase.textColor}>Level {currentLevelId}</span>
+              <span>/</span>
+              <span>ページ {currentPage.id}</span>
+            </div>
 
-          <div className="px-4 lg:px-0">
-            <div className={`rounded-2xl border ${phase.borderColor} bg-slate-900 overflow-hidden`}>
-              <div className={`border-b ${phase.borderColor} bg-gradient-to-r ${phase.bgGradient} px-6 py-4`}>
-                <div className="flex items-center gap-2 mb-1">
+            {/* レベルヘッダー */}
+            <div className={`mb-4 rounded-xl border ${phase.borderColor} bg-gradient-to-r ${phase.bgGradient} p-4`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={`text-xs ${phase.badgeBg}`}>Level {currentLevelId}</Badge>
+                <Badge className="bg-slate-700 text-xs text-slate-300">
+                  {currentLevel.estimatedTime}
+                </Badge>
+              </div>
+              <h2 className="mt-2 text-lg font-bold text-white">{currentLevel.title}</h2>
+              <p className="text-sm text-slate-400">{currentLevel.description}</p>
+            </div>
+
+            {/* ページタブ */}
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1">
+                {currentLevel.pages.map((page, idx) => {
+                  const pCleared = isPageCleared(phase.id, currentLevelId, page.id);
+                  const pActive = idx === currentPageIndex;
+                  return (
+                    <button
+                      key={page.id}
+                      onClick={() => goToPage(idx)}
+                      className={`shrink-0 flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                        pActive
+                          ? `${phase.borderColor} ${phase.textColor} bg-slate-800 font-medium`
+                          : pCleared
+                          ? 'border-white/10 text-slate-400 hover:bg-slate-800'
+                          : 'border-white/5 text-slate-600 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      {pCleared && !pActive ? '✅ ' : page.type === 'input' ? '📖 ' : '✏️ '}
+                      ページ{page.id}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="shrink-0 text-xs text-slate-500">
+                {currentPageIndex + 1} / {totalPages}
+              </span>
+            </div>
+
+            {/* ページコンテンツ */}
+            <div className={`rounded-2xl border ${phase.borderColor} bg-slate-900`}>
+              {/* ページヘッダー */}
+              <div className={`border-b ${phase.borderColor} px-6 py-4 bg-gradient-to-r ${phase.bgGradient}`}>
+                <div className="flex items-center gap-2">
                   <Badge className={`text-xs ${phase.badgeBg}`}>
-                    {currentLevel.type === 'input' ? '📖 インプット' : '✏️ アウトプット'}
+                    {currentPage.type === 'input' ? '📖 インプット' : '✏️ アウトプット'}
                   </Badge>
-                  <span className="text-xs text-slate-500">
-                    Lv.{currentLevel.id} / {phase.levels.length}
-                  </span>
+                  <span className="text-xs text-slate-500">ページ {currentPage.id} / {totalPages}</span>
                 </div>
-                <h2 className="text-xl font-bold text-white">{currentLevel.title}</h2>
-                <p className="text-sm text-slate-400">{currentLevel.description}</p>
+                <h3 className="mt-2 text-xl font-bold text-white">{currentPage.title}</h3>
               </div>
 
               <div className="p-6">
-                {currentLevel.type === 'input' ? (
-                  <InputSection level={currentLevel as InputLevel} />
+                {currentPage.type === 'input' ? (
+                  <InputPageContent page={currentPage as InputPage} phaseColor={phase.textColor} />
                 ) : (
-                  <OutputSection
-                    level={currentLevel as OutputLevel}
+                  <OutputPageContent
+                    page={currentPage as OutputPage}
+                    phaseColor={phase.textColor}
+                    phaseBorderColor={phase.borderColor}
                     selectedOption={selectedOption}
                     answered={answered}
                     shortAnswer={shortAnswer}
                     chatInput={chatInput}
                     chatMessages={chatMessages}
                     showHint={showHint}
+                    isTyping={isTyping}
                     onSelectOption={handleMultipleChoice}
                     onShortAnswerChange={setShortAnswer}
                     onShortAnswerSubmit={handleShortAnswerSubmit}
                     onChatInputChange={setChatInput}
                     onChatSend={handleChatSend}
-                    onToggleHint={() => setShowHint(!showHint)}
+                    onToggleHint={() => setShowHint((v) => !v)}
                   />
                 )}
 
-                <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4">
+                {/* ナビゲーション */}
+                <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-4">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => currentLevelIndex > 0 && goToLevel(currentLevelIndex - 1)}
-                    disabled={currentLevelIndex === 0}
+                    onClick={() => {
+                      if (currentPageIndex > 0) goToPage(currentPageIndex - 1);
+                      else if (currentLevelId > 1) goToLevel(currentLevelId - 1);
+                    }}
+                    disabled={currentPageIndex === 0 && currentLevelId === 1}
                     className="text-slate-400 hover:text-white"
                   >
                     ← 前へ
                   </Button>
 
                   <div className="flex items-center gap-3">
-                    {isCurrentLevelCleared ? (
+                    {isPageCleared(phase.id, currentLevelId, currentPage.id) && (
                       <span className="text-xs text-emerald-400">✅ クリア済み</span>
-                    ) : null}
-
+                    )}
                     <Button
-                      onClick={handleNextLevel}
-                      disabled={
-                        currentLevel.type === 'output' &&
-                        !answered &&
-                        chatMessages.length === 0
-                      }
+                      onClick={handleNext}
+                      disabled={!canProceed}
                       className="bg-indigo-600 hover:bg-indigo-500"
                     >
-                      {isLastLevel ? 'フェーズクリア！' : '次へ →'}
+                      {currentPageIndex < totalPages - 1
+                        ? '次のページへ →'
+                        : isLevelCleared(phase.id, currentLevelId)
+                        ? 'レベル完了 ✅'
+                        : 'レベルをクリア →'}
                     </Button>
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* レベル進捗インジケーター */}
+            <div className="mt-4 rounded-xl border border-white/5 bg-slate-900/50 p-3">
+              <div className="mb-1.5 flex justify-between text-xs text-slate-500">
+                <span>Level {currentLevelId} 進捗</span>
+                <span>{levelProgress}%</span>
+              </div>
+              <Progress value={levelProgress} className="h-1 bg-slate-800" />
             </div>
           </div>
         </div>
@@ -297,69 +376,79 @@ export function PhaseContent({ phase }: Props) {
   );
 }
 
-function InputSection({ level }: { level: InputLevel }) {
+// ============================================================
+// インプットページ
+// ============================================================
+function InputPageContent({ page, phaseColor }: { page: InputPage; phaseColor: string }) {
   return (
     <div>
-      <div className="prose prose-invert prose-sm max-w-none">
+      <article className="prose-dify">
         <ReactMarkdown
           components={{
             h2: ({ children }) => (
-              <h2 className="mt-6 mb-3 text-lg font-bold text-white border-b border-white/10 pb-2">
+              <h2 className="mb-3 mt-8 flex items-center gap-2 border-b border-white/10 pb-2 text-lg font-bold text-white first:mt-0">
                 {children}
               </h2>
             ),
             h3: ({ children }) => (
-              <h3 className="mt-4 mb-2 text-base font-semibold text-slate-200">{children}</h3>
+              <h3 className="mb-2 mt-5 text-base font-semibold text-slate-200">{children}</h3>
             ),
             p: ({ children }) => (
-              <p className="mb-3 text-slate-300 leading-relaxed">{children}</p>
+              <p className="mb-4 leading-relaxed text-slate-300">{children}</p>
             ),
             ul: ({ children }) => (
-              <ul className="mb-3 ml-4 space-y-1 list-disc text-slate-300">{children}</ul>
+              <ul className="mb-4 ml-5 space-y-1.5 list-disc text-slate-300">{children}</ul>
             ),
             ol: ({ children }) => (
-              <ol className="mb-3 ml-4 space-y-1 list-decimal text-slate-300">{children}</ol>
+              <ol className="mb-4 ml-5 space-y-1.5 list-decimal text-slate-300">{children}</ol>
             ),
-            li: ({ children }) => <li className="text-slate-300">{children}</li>,
-            code: ({ children }) => (
-              <code className="rounded bg-slate-800 px-1.5 py-0.5 text-xs font-mono text-indigo-300">
-                {children}
-              </code>
-            ),
+            li: ({ children }) => <li className="leading-relaxed text-slate-300">{children}</li>,
+            code: ({ children, className }) => {
+              const isBlock = className?.includes('language-');
+              if (isBlock) return <code className="text-indigo-300">{children}</code>;
+              return (
+                <code className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-sm text-indigo-300">
+                  {children}
+                </code>
+              );
+            },
             pre: ({ children }) => (
-              <pre className="my-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-sm font-mono text-slate-300">
+              <pre className="my-4 overflow-x-auto rounded-xl bg-slate-800 p-4 font-mono text-sm text-slate-300 border border-white/10">
                 {children}
               </pre>
             ),
             table: ({ children }) => (
-              <div className="my-3 overflow-x-auto rounded-xl border border-white/10">
+              <div className="my-4 overflow-x-auto rounded-xl border border-white/10">
                 <table className="w-full text-sm">{children}</table>
               </div>
             ),
+            thead: ({ children }) => <thead className="bg-slate-800">{children}</thead>,
             th: ({ children }) => (
-              <th className="border-b border-white/10 bg-slate-800 px-4 py-2 text-left text-slate-300">
-                {children}
-              </th>
+              <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300">{children}</th>
             ),
             td: ({ children }) => (
-              <td className="border-b border-white/5 px-4 py-2 text-slate-400">{children}</td>
+              <td className="border-t border-white/5 px-4 py-2 text-slate-400">{children}</td>
             ),
-            strong: ({ children }) => (
-              <strong className="font-semibold text-white">{children}</strong>
+            strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+            blockquote: ({ children }) => (
+              <blockquote className="my-4 border-l-4 border-indigo-500/50 pl-4 text-slate-400 italic">
+                {children}
+              </blockquote>
             ),
+            hr: () => <hr className="my-6 border-white/10" />,
           }}
         >
-          {level.content}
+          {page.content}
         </ReactMarkdown>
-      </div>
+      </article>
 
-      {level.keyPoints.length > 0 && (
-        <div className="mt-6 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4">
-          <p className="mb-2 text-sm font-semibold text-indigo-400">💡 このレベルのポイント</p>
-          <ul className="space-y-1">
-            {level.keyPoints.map((point, i) => (
+      {page.keyPoints && page.keyPoints.length > 0 && (
+        <div className={`mt-6 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4`}>
+          <p className="mb-3 text-sm font-semibold text-indigo-400">💡 このページのまとめ</p>
+          <ul className="space-y-2">
+            {page.keyPoints.map((point, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
-                <span className="mt-0.5 text-indigo-400">✓</span>
+                <span className={`mt-0.5 shrink-0 font-bold text-indigo-400`}>✓</span>
                 {point}
               </li>
             ))}
@@ -370,14 +459,20 @@ function InputSection({ level }: { level: InputLevel }) {
   );
 }
 
+// ============================================================
+// アウトプットページ
+// ============================================================
 type OutputProps = {
-  level: OutputLevel;
+  page: OutputPage;
+  phaseColor: string;
+  phaseBorderColor: string;
   selectedOption: number | null;
   answered: boolean;
   shortAnswer: string;
   chatInput: string;
   chatMessages: { role: 'user' | 'assistant'; text: string }[];
   showHint: boolean;
+  isTyping: boolean;
   onSelectOption: (idx: number) => void;
   onShortAnswerChange: (val: string) => void;
   onShortAnswerSubmit: () => void;
@@ -386,14 +481,15 @@ type OutputProps = {
   onToggleHint: () => void;
 };
 
-function OutputSection({
-  level,
+function OutputPageContent({
+  page,
   selectedOption,
   answered,
   shortAnswer,
   chatInput,
   chatMessages,
   showHint,
+  isTyping,
   onSelectOption,
   onShortAnswerChange,
   onShortAnswerSubmit,
@@ -401,64 +497,69 @@ function OutputSection({
   onChatSend,
   onToggleHint,
 }: OutputProps) {
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, isTyping]);
+
   return (
     <div>
-      <div className="mb-6 rounded-xl border border-white/10 bg-slate-800/50 p-4">
-        <p className="text-sm font-medium text-slate-200 whitespace-pre-wrap">{level.question}</p>
+      <div className="mb-6 rounded-xl border border-white/10 bg-slate-800/50 p-5">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{page.question}</p>
       </div>
 
-      {level.format === 'multiple-choice' && level.options && (
-        <div className="space-y-2">
-          {level.options.map((option, idx) => {
+      {/* 選択肢 */}
+      {page.format === 'multiple-choice' && page.options && (
+        <div className="space-y-2.5">
+          {page.options.map((opt, idx) => {
             let cls =
-              'w-full rounded-xl border p-3 text-left text-sm transition-all cursor-pointer ';
+              'w-full rounded-xl border p-4 text-left text-sm transition-all ';
             if (!answered) {
-              cls += 'border-white/10 bg-slate-800 text-slate-300 hover:border-white/30 hover:bg-slate-700';
+              cls += 'border-white/10 bg-slate-800 text-slate-300 hover:border-white/30 hover:bg-slate-700 cursor-pointer';
             } else if (selectedOption === idx) {
-              cls += option.isCorrect
-                ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
-                : 'border-rose-500 bg-rose-500/20 text-rose-300';
-            } else if (option.isCorrect) {
-              cls += 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400';
+              cls += opt.isCorrect
+                ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300 cursor-default'
+                : 'border-rose-500 bg-rose-500/20 text-rose-300 cursor-default';
+            } else if (opt.isCorrect) {
+              cls += 'border-emerald-500/40 bg-emerald-500/5 text-emerald-400/70 cursor-default';
             } else {
-              cls += 'border-white/5 bg-slate-800/50 text-slate-500';
+              cls += 'border-white/5 bg-slate-800/30 text-slate-600 cursor-default';
             }
             return (
               <button key={idx} className={cls} onClick={() => onSelectOption(idx)}>
-                <span className="mr-2 font-mono">{String.fromCharCode(65 + idx)}.</span>
-                {option.label}
+                <span className="mr-3 font-mono font-bold">{String.fromCharCode(65 + idx)}.</span>
+                {opt.label}
               </button>
             );
           })}
           {answered && (
             <div
-              className={`mt-3 rounded-xl p-3 text-sm ${
-                level.options[selectedOption ?? 0]?.isCorrect
-                  ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+              className={`mt-2 rounded-xl border p-3 text-sm ${
+                page.options[selectedOption ?? 0]?.isCorrect
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                  : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
               }`}
             >
-              {level.options[selectedOption ?? 0]?.isCorrect
-                ? '✅ 正解です！次のレベルに進みましょう。'
-                : '❌ 不正解です。正解は「' +
-                  level.options.find((o) => o.isCorrect)?.label +
-                  '」です。'}
+              {page.options[selectedOption ?? 0]?.isCorrect
+                ? '✅ 正解です！次のページへ進みましょう。'
+                : `❌ 不正解。正解は「${page.options.find((o) => o.isCorrect)?.label}」です。もう一度復習してから次へ進みましょう。`}
             </div>
           )}
         </div>
       )}
 
-      {level.format === 'short-answer' && (
+      {/* 短答 */}
+      {page.format === 'short-answer' && (
         <div>
           <textarea
             value={shortAnswer}
             onChange={(e) => onShortAnswerChange(e.target.value)}
             disabled={answered}
             placeholder="ここに回答を入力してください..."
-            rows={4}
-            className="w-full resize-none rounded-xl border border-white/10 bg-slate-800 p-3 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
+            rows={5}
+            className="w-full resize-none rounded-xl border border-white/10 bg-slate-800 p-4 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
           />
-          {!answered && (
+          {!answered ? (
             <Button
               onClick={onShortAnswerSubmit}
               disabled={!shortAnswer.trim()}
@@ -466,49 +567,66 @@ function OutputSection({
             >
               回答する
             </Button>
-          )}
-          {answered && (
+          ) : (
             <div className="mt-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3 text-sm text-slate-300">
-              ✅ 回答しました！AIメンターのフィードバックを参考に、次のレベルへ進みましょう。
+              ✅ 回答しました。AIメンターへの報告も活用しながら次のページへ進みましょう。
             </div>
           )}
         </div>
       )}
 
-      {level.format === 'chat' && (
+      {/* チャット */}
+      {page.format === 'chat' && (
         <div>
-          <div className="mb-3 rounded-xl border border-white/10 bg-slate-800 h-48 overflow-y-auto p-3 space-y-2">
+          <div className="mb-3 h-56 overflow-y-auto rounded-xl border border-white/10 bg-slate-800 p-3 space-y-2">
             {chatMessages.length === 0 && (
-              <p className="text-xs text-slate-600 text-center mt-8">
-                AIメンターに報告・質問してみましょう
-              </p>
+              <div className="flex h-full items-center justify-center">
+                <p className="text-xs text-slate-600">AIメンターに話しかけてみましょう</p>
+              </div>
             )}
             {chatMessages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
                     msg.role === 'user'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-200'
+                      ? 'rounded-br-sm bg-indigo-600 text-white'
+                      : 'rounded-bl-sm bg-slate-700 text-slate-200'
                   }`}
                 >
                   {msg.text}
                 </div>
               </div>
             ))}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl rounded-bl-sm bg-slate-700 px-3 py-2">
+                  <span className="flex gap-1 text-slate-400">
+                    {[0, 150, 300].map((d) => (
+                      <span
+                        key={d}
+                        className="animate-bounce"
+                        style={{ animationDelay: `${d}ms` }}
+                      >•</span>
+                    ))}
+                  </span>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
           </div>
           <div className="flex gap-2">
             <input
               type="text"
               value={chatInput}
               onChange={(e) => onChatInputChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && onChatSend()}
-              placeholder="AIメンターに話しかける..."
-              className="flex-1 rounded-xl border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500"
+              onKeyDown={(e) => e.key === 'Enter' && !isTyping && onChatSend()}
+              placeholder="メンターに話しかける... (Enterで送信)"
+              disabled={isTyping}
+              className="flex-1 rounded-xl border border-white/10 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
             />
             <Button
               onClick={onChatSend}
-              disabled={!chatInput.trim()}
+              disabled={!chatInput.trim() || isTyping}
               className="bg-indigo-600 hover:bg-indigo-500"
             >
               送信
@@ -516,23 +634,24 @@ function OutputSection({
           </div>
           {chatMessages.length > 0 && (
             <p className="mt-2 text-xs text-slate-500">
-              AIメンターに報告できたら「次へ」を押してクリアしましょう。
+              AIメンターと会話できたら「次のページへ」ボタンで進めます。
             </p>
           )}
         </div>
       )}
 
-      {level.hint && (
-        <div className="mt-4">
+      {/* ヒント */}
+      {page.hint && (
+        <div className="mt-5">
           <button
             onClick={onToggleHint}
-            className="text-xs text-slate-500 hover:text-slate-300 underline"
+            className="text-xs text-slate-500 underline hover:text-slate-300"
           >
-            {showHint ? 'ヒントを隠す' : 'ヒントを見る'}
+            {showHint ? 'ヒントを隠す ▲' : 'ヒントを見る ▼'}
           </button>
           {showHint && (
-            <div className="mt-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-300">
-              💡 {level.hint}
+            <div className="mt-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-200">
+              💡 {page.hint}
             </div>
           )}
         </div>
@@ -541,23 +660,23 @@ function OutputSection({
   );
 }
 
-function generateMockChatReply(input: string, phaseId: number, levelId: number): string {
+// ============================================================
+// モックメンター応答
+// ============================================================
+function mockMentorReply(input: string, phaseId: number, levelId: number, pageId: number): string {
   const lower = input.toLowerCase();
-
-  if (lower.includes('完了') || lower.includes('できました') || lower.includes('しました') || lower.includes('繋ぎました')) {
-    return `素晴らしいですね！Phase ${phaseId} Level ${levelId}の課題を達成できたとのこと、とても素晴らしい進歩です！\n\n実際に手を動かしてDifyを操作したことで、概念が体感として理解できたと思います。このまま「次へ」ボタンを押して次のレベルに進みましょう！`;
+  if (lower.includes('完了') || lower.includes('できました') || lower.includes('しました') || lower.includes('繋ぎ')) {
+    return `素晴らしいです！Phase ${phaseId} Level ${levelId} ページ${pageId}の内容を実践されたんですね。\n\n実際に手を動かすことで概念が体感として定着します。「次のページへ」ボタンを押して次へ進みましょう！何か気になった点があればいつでも聞いてください。`;
   }
-
-  if (lower.includes('わからない') || lower.includes('教えて') || lower.includes('ヒント')) {
+  if (lower.includes('わからない') || lower.includes('教えて') || lower.includes('ヒント') || lower.includes('詰まっ')) {
     const hints: Record<number, string> = {
-      1: 'Difyの画面で「+」ボタンを押すとブロックを追加できます。開始→LLM→回答の順に繋いでみてください。',
-      2: '{{変数名}}の形式で変数を参照できます。まず開始ブロックで変数を定義してから、LLMのシステムプロンプトで使いましょう。',
-      3: '質問分類器ブロックを追加して、2つのクラス（「質問」と「課題提出」）を設定してみてください。',
-      4: 'ナレッジメニューからドキュメントをアップロードし、フローに「知識検索」ブロックを追加してみましょう。',
-      5: '並列処理は、同じブロックから2本の矢印を出して、別々のブロックに繋ぐことで実現できます。',
+      1: 'まずcloud.dify.aiにアクセスして、「スタジオ」タブを開いてみましょう。+ボタンからアプリを作成できます。',
+      2: '開始ブロックの設定パネルを開くと「入力フィールドを追加」ボタンがあります。変数名はスペルミスに注意してください。',
+      3: '質問分類器ブロックを追加したら、各クラスの出口から別々のLLMブロックに矢印を繋いでみましょう。',
+      4: 'ナレッジ機能はサイドバーの「ナレッジ」から作成します。ドキュメントをアップロードしてから知識検索ブロックで参照します。',
+      5: '並列処理は同じブロックから複数の矢印を出します。変数集約器で結果をまとめることを忘れずに。',
     };
-    return hints[phaseId] || 'もう少し詳しく教えてもらえますか？何でつまずいているか教えていただければ、的確なヒントをお伝えできます。';
+    return hints[phaseId] || 'もう少し詳しく教えてもらえますか？どの操作でつまずいているか教えていただければ、より具体的なアドバイスができます。';
   }
-
-  return `なるほど！Phase ${phaseId}の課題ですね。\n\nDifyは実際に手を動かすことが大切です。わからなくなったらいつでも聞いてください。課題が完了したら「完了しました」と教えてくれると、クリアの確認ができます！`;
+  return `なるほど！Phase ${phaseId}のLevel ${levelId}について教えてくれてありがとうございます。\n\nDifyは実際に手を動かすことが上達の近道です。もし詰まったら具体的に「〇〇の操作で困っている」と教えてください。一緒に解決しましょう！\n\n課題が完了したら「次のページへ」を押して進みましょう。`;
 }

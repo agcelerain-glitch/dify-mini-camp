@@ -14,13 +14,11 @@ import { Button } from '@/components/ui/button';
 
 export default function CampPage() {
   const { user, isLoading } = useAuth();
-  const { isPhaseUnlocked, isPhaseCleared, progress } = useProgress();
+  const { isPhaseCleared, isLevelCleared, progress } = useProgress();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace('/');
-    }
+    if (!isLoading && !user) router.replace('/');
   }, [user, isLoading, router]);
 
   if (isLoading || !user) {
@@ -31,10 +29,10 @@ export default function CampPage() {
     );
   }
 
-  function getLevelProgress(phaseId: number): number {
+  function getPhaseProgress(phaseId: number): number {
     const phase = PHASES.find((p) => p.id === phaseId);
     if (!phase) return 0;
-    const cleared = progress.phases[phaseId]?.clearedLevels.length ?? 0;
+    const cleared = phase.levels.filter((l) => isLevelCleared(phaseId, l.id)).length;
     return Math.round((cleared / phase.levels.length) * 100);
   }
 
@@ -45,103 +43,113 @@ export default function CampPage() {
       <main className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-white">⛺ キャンプ</h1>
-          <p className="mt-1 text-slate-400">フェーズを選んで学習を始めましょう。前のフェーズをクリアすると次が解放されます。</p>
+          <p className="mt-1 text-slate-400">
+            フェーズとレベルを選んで学習を始めましょう。すべてのフェーズに自由にアクセスできます。
+          </p>
+          {/* ロック機能復活ガイド
+              Supabase連携時は front/lib/phases-data.ts の LOCK_ENABLED を true に変更。
+              isPhaseUnlocked / isLevelUnlocked が自動的にロック判定を行います。
+          */}
         </div>
 
-        <div className="space-y-4">
-          {PHASES.map((phase, index) => {
-            const unlocked = isPhaseUnlocked(phase.id);
+        <div className="space-y-6">
+          {PHASES.map((phase) => {
             const cleared = isPhaseCleared(phase.id);
             const isCurrent = phase.id === progress.currentPhase;
-            const levelPct = getLevelProgress(phase.id);
+            const pct = getPhaseProgress(phase.id);
             const currentLevel = progress.phases[phase.id]?.currentLevel ?? 1;
 
             return (
               <div
                 key={phase.id}
-                className={`relative rounded-2xl border transition-all ${
-                  unlocked
-                    ? `${phase.borderColor} bg-slate-900`
-                    : 'border-white/5 bg-slate-900/20 opacity-50'
-                }`}
+                className={`rounded-2xl border ${phase.borderColor} bg-slate-900 ${isCurrent ? 'ring-1 ring-indigo-500/30' : ''}`}
               >
                 {isCurrent && (
-                  <div className="absolute -top-2 left-6">
-                    <Badge className="bg-indigo-600 text-white text-xs">現在地</Badge>
+                  <div className="flex items-center gap-1 rounded-t-2xl border-b border-white/10 bg-indigo-600/10 px-5 py-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                    <span className="text-xs text-indigo-400">現在学習中</span>
                   </div>
                 )}
 
                 <div className="p-5">
                   <div className="flex flex-wrap items-start gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-2xl">
-                      {cleared ? '✅' : unlocked ? phase.icon : '🔒'}
+                      {cleared ? '✅' : phase.icon}
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-xs text-slate-500">{phase.subtitle}</span>
+                        <span className="text-xs font-bold text-slate-500">{phase.subtitle}</span>
                         <Badge className={`text-xs ${phase.badgeBg}`}>{phase.difficultyLabel}</Badge>
                         <span className="text-xs text-slate-500">⏱ {phase.duration}</span>
                       </div>
-                      <h3 className={`text-lg font-bold ${unlocked ? 'text-white' : 'text-slate-500'}`}>
-                        {phase.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-400">{phase.description}</p>
+                      <h3 className="text-lg font-bold text-white">{phase.title}</h3>
+                      <p className="mt-0.5 text-sm text-slate-400">{phase.description}</p>
 
-                      {unlocked && (
-                        <div className="mt-3">
-                          <div className="mb-1 flex justify-between text-xs text-slate-500">
-                            <span>レベル {currentLevel} / {phase.levels.length}</span>
-                            <span>{levelPct}%</span>
-                          </div>
-                          <Progress value={levelPct} className="h-1.5 bg-slate-700" />
+                      <div className="mt-3">
+                        <div className="mb-1 flex justify-between text-xs text-slate-500">
+                          <span>Level進捗</span>
+                          <span>{pct}%</span>
                         </div>
-                      )}
+                        <Progress value={pct} className="h-1.5 bg-slate-700" />
+                      </div>
 
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      {/* レベル一覧 */}
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {phase.levels.map((level) => {
-                          const levelCleared = progress.phases[phase.id]?.clearedLevels.includes(level.id);
+                          const lCleared = isLevelCleared(phase.id, level.id);
+                          const lCurrent = level.id === currentLevel && isCurrent;
+                          const clearedPages =
+                            progress.phases[phase.id]?.levels[level.id]?.clearedPages.length ?? 0;
+                          const levelPct = Math.round((clearedPages / level.pages.length) * 100);
+
                           return (
-                            <span
+                            <Link
                               key={level.id}
-                              className={`rounded-full px-2 py-0.5 text-xs border ${
-                                levelCleared
-                                  ? `${phase.borderColor} ${phase.textColor}`
-                                  : 'border-white/10 text-slate-600'
+                              href={`/camp/${phase.id}`}
+                              className={`rounded-xl border p-3 transition-colors hover:bg-slate-800 ${
+                                lCleared
+                                  ? 'border-emerald-500/30 bg-emerald-500/5'
+                                  : lCurrent
+                                  ? `${phase.borderColor} bg-slate-800/50`
+                                  : 'border-white/5 bg-slate-800/30'
                               }`}
                             >
-                              {level.type === 'input' ? '📖' : '✏️'} Lv.{level.id}
-                            </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold ${lCurrent ? phase.textColor : 'text-slate-500'}`}>
+                                  Level {level.id}
+                                </span>
+                                {lCleared && <span className="ml-auto text-xs">✅</span>}
+                              </div>
+                              <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{level.title}</p>
+                              <div className="mt-2">
+                                <div className="mb-0.5 flex justify-between text-xs text-slate-600">
+                                  <span>{level.pages.length}ページ</span>
+                                  <span>{levelPct}%</span>
+                                </div>
+                                <Progress value={levelPct} className="h-0.5 bg-slate-700" />
+                              </div>
+                            </Link>
                           );
                         })}
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
-                      {unlocked ? (
-                        <Link href={`/camp/${phase.id}`}>
-                          <Button
-                            className={
-                              cleared
-                                ? 'bg-slate-700 hover:bg-slate-600'
-                                : 'bg-indigo-600 hover:bg-indigo-500'
-                            }
-                          >
-                            {cleared ? '復習する' : isCurrent ? '続ける →' : '始める →'}
-                          </Button>
-                        </Link>
-                      ) : (
-                        <div className="text-xs text-slate-600 text-right">
-                          Phase {phase.id - 1} をクリアすると<br />解放されます
-                        </div>
-                      )}
+                    <div className="shrink-0">
+                      <Link href={`/camp/${phase.id}`}>
+                        <Button
+                          className={
+                            cleared
+                              ? 'bg-slate-700 hover:bg-slate-600'
+                              : 'bg-indigo-600 hover:bg-indigo-500'
+                          }
+                        >
+                          {cleared ? '復習する' : isCurrent ? '続ける →' : '始める →'}
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </div>
-
-                {index < PHASES.length - 1 && (
-                  <div className={`mx-auto my-0 h-6 w-0.5 ${unlocked && isPhaseUnlocked(PHASES[index + 1].id) ? 'bg-white/10' : 'bg-white/5'}`} />
-                )}
               </div>
             );
           })}

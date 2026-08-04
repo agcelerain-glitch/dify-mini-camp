@@ -28,5 +28,6 @@ Thumbs.db
 *.swo
 
 # 機密情報（絶対にコミットしない）
+other/
 other/client_secret_*.json
 other/memo.txt
