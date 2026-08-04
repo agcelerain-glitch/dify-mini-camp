@@ -1,0 +1,27 @@
+{
+  "name": "Dify mini Camp",
+  "short_name": "DifyCamp",
+  "description": "AIメンター付きDify学習プラットフォーム。初心者から中上級者まで段階的にDifyをマスターしよう。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#4f46e5",
+  "lang": "ja",
+  "categories": ["education"],
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "orientation": "any"
+}

@@ -9,6 +9,19 @@
 
 ---
 
+## [0.4.0] - 2026-08-04
+
+### Added
+- **Favicon 完全対応** — layout.tsx の metadata.icons に favicon.ico / PNG 各サイズ / apple-touch-icon を設定
+- **PWA manifest.json 作成** — `front/public/manifest.json` を追加。名前・テーマカラー・アイコン・言語（ja）・display: standalone を設定
+- **テーブルのMarkdownレンダリング修正** — `remark-gfm` を導入し、`|パイプ|` 記法を正しくHTMLテーブルにパース
+- **テーブルデザイン刷新** — グラデーションヘッダー・ホバーエフェクト・カラム間セパレーターなど、デザイン性の高いテーブルスタイルに更新
+- **Supabase DB スキーマ更新** — Phase/Level/Page 3階層対応に再設計（`progress` + `user_state` テーブル）
+- **ユーザー自動作成トリガー追加** — Google OAuth ログイン時に `public.users` へ自動挿入するトリガーを `01_users.sql` に追加
+- **todo02.txt 作成** — Supabase/Dify API 連携の次ステップを詳細に記述（STEP A〜H）
+
+---
+
 ## [0.3.0] - 2026-08-04
 
 ### Changed

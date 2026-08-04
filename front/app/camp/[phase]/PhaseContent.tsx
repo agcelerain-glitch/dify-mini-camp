@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProgress } from '@/contexts/ProgressContext';
 import { Phase, Level, InputPage, OutputPage, Page } from '@/lib/phases-data';
@@ -391,6 +392,7 @@ function InputPageContent({ page, phaseColor }: { page: InputPage; phaseColor: s
     <div>
       <article className="prose-dify">
         <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
           components={{
             h2: ({ children }) => (
               <h2 className="mb-3 mt-8 flex items-center gap-2 border-b border-white/10 pb-2 text-lg font-bold text-white first:mt-0">
@@ -425,16 +427,24 @@ function InputPageContent({ page, phaseColor }: { page: InputPage; phaseColor: s
               </pre>
             ),
             table: ({ children }) => (
-              <div className="my-4 overflow-x-auto rounded-xl border border-white/10">
-                <table className="w-full text-sm">{children}</table>
+              <div className="my-6 overflow-x-auto rounded-2xl border border-white/10 shadow-lg shadow-black/20">
+                <table className="w-full text-sm border-collapse">{children}</table>
               </div>
             ),
-            thead: ({ children }) => <thead className="bg-slate-800">{children}</thead>,
+            thead: ({ children }) => (
+              <thead className="bg-gradient-to-r from-slate-800 to-slate-700/80">{children}</thead>
+            ),
             th: ({ children }) => (
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-300">{children}</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold tracking-wider text-slate-200 uppercase">
+                {children}
+              </th>
+            ),
+            tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
+            tr: ({ children }) => (
+              <tr className="transition-colors hover:bg-white/[0.02]">{children}</tr>
             ),
             td: ({ children }) => (
-              <td className="border-t border-white/5 px-4 py-2 text-slate-400">{children}</td>
+              <td className="px-5 py-3 text-slate-300 align-top leading-relaxed">{children}</td>
             ),
             strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
             blockquote: ({ children }) => (
