@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProgress } from '@/contexts/ProgressContext';
-import { Phase, Level, InputPage, OutputPage, Page } from '@/lib/phases-data';
+import { Phase, Level, InputPage, OutputPage, Page, PHASES } from '@/lib/phases-data';
 import { Navbar } from '@/components/Navbar';
 import { ChatbotButton } from '@/components/ChatbotButton';
 import { Badge } from '@/components/ui/badge';
@@ -351,17 +351,45 @@ export function PhaseContent({ phase }: Props) {
                     {isPageCleared(phase.id, currentLevelId, currentPage.id) && (
                       <span className="text-xs text-emerald-400">✅ クリア済み</span>
                     )}
-                    <Button
-                      onClick={handleNext}
-                      disabled={!canProceed}
-                      className="bg-indigo-600 hover:bg-indigo-500"
-                    >
-                      {currentPageIndex < totalPages - 1
-                        ? '次のページへ →'
-                        : isLevelCleared(phase.id, currentLevelId)
-                        ? 'レベル完了 ✅'
-                        : 'レベルをクリア →'}
-                    </Button>
+
+                    {currentPageIndex < totalPages - 1 ? (
+                      <Button
+                        onClick={handleNext}
+                        disabled={!canProceed}
+                        className="bg-indigo-600 hover:bg-indigo-500"
+                      >
+                        次のページへ →
+                      </Button>
+                    ) : !isLevelCleared(phase.id, currentLevelId) ? (
+                      <Button
+                        onClick={handleNext}
+                        disabled={!canProceed}
+                        className="bg-indigo-600 hover:bg-indigo-500"
+                      >
+                        レベルをクリア 🎉
+                      </Button>
+                    ) : currentLevelId < phase.levels.length ? (
+                      <Button
+                        onClick={() => goToLevel(currentLevelId + 1)}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        次のレベルへ →
+                      </Button>
+                    ) : phase.id < PHASES.length ? (
+                      <Button
+                        onClick={() => router.push(`/camp/${phase.id + 1}`)}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        次のフェーズへ →
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => router.push('/camp')}
+                        className="bg-yellow-600 hover:bg-yellow-500"
+                      >
+                        🎊 全コース完了！
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -380,6 +408,39 @@ export function PhaseContent({ phase }: Props) {
       </div>
 
       <ChatbotButton />
+    </div>
+  );
+}
+
+// ============================================================
+// コピーボタン付きコードブロック
+// ============================================================
+function CopyableCodeBlock({ children }: { children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  function handleCopy() {
+    const text = preRef.current?.textContent ?? '';
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="relative my-4">
+      <pre
+        ref={preRef}
+        className="overflow-x-auto rounded-xl bg-slate-800 p-4 pr-24 font-mono text-sm text-slate-300 border border-white/10"
+      >
+        {children}
+      </pre>
+      <button
+        onClick={handleCopy}
+        className="absolute right-2 top-2 rounded-lg bg-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-600 transition-colors"
+      >
+        {copied ? '✓ コピー済み' : 'コピー'}
+      </button>
     </div>
   );
 }
@@ -421,11 +482,7 @@ function InputPageContent({ page, phaseColor }: { page: InputPage; phaseColor: s
                 </code>
               );
             },
-            pre: ({ children }) => (
-              <pre className="my-4 overflow-x-auto rounded-xl bg-slate-800 p-4 font-mono text-sm text-slate-300 border border-white/10">
-                {children}
-              </pre>
-            ),
+            pre: ({ children }) => <CopyableCodeBlock>{children}</CopyableCodeBlock>,
             table: ({ children }) => (
               <div className="my-6 overflow-x-auto rounded-2xl border border-white/10 shadow-lg shadow-black/20">
                 <table className="w-full text-sm border-collapse">{children}</table>
