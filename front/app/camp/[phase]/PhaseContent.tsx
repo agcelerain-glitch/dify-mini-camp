@@ -18,7 +18,7 @@ type Props = { phase: Phase };
 
 export function PhaseContent({ phase }: Props) {
   const { user, isLoading } = useAuth();
-  const { progress, isLevelCleared, isPageCleared, completePage, completeLevel } = useProgress();
+  const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, completePage, completeLevel } = useProgress();
   const router = useRouter();
 
   const [currentLevelId, setCurrentLevelId] = useState(1);
@@ -39,10 +39,20 @@ export function PhaseContent({ phase }: Props) {
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [showHint, setShowHint] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isCleared, setIsCleared] = useState(false);
+  const [gradingPending, setGradingPending] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace('/');
   }, [user, isLoading, router]);
+
+  // ロックされたフェーズへのアクセスはキャンプページへリダイレクト
+  // isProgressLoading が false になってから判定（非同期ロード中の誤リダイレクト防止）
+  useEffect(() => {
+    if (!isLoading && user && !isProgressLoading && !isPhaseUnlocked(phase.id)) {
+      router.replace('/camp');
+    }
+  }, [isLoading, isProgressLoading, user, phase.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentLevel = phase.levels.find((l) => l.id === currentLevelId) ?? phase.levels[0];
   const currentPage = currentLevel.pages[currentPageIndex];
@@ -72,9 +82,12 @@ export function PhaseContent({ phase }: Props) {
     setChatInput('');
     setChatMessages([]);
     setShowHint(false);
+    setIsCleared(false);
+    setGradingPending(false);
   }
 
   function goToLevel(levelId: number) {
+    if (!isLevelUnlocked(phase.id, levelId)) return;
     setCurrentLevelId(levelId);
     setCurrentPageIndex(0);
     resetPageState();
@@ -107,17 +120,97 @@ export function PhaseContent({ phase }: Props) {
     setAnswered(true);
   }
 
-  function handleChatSend() {
-    if (!chatInput.trim()) return;
+  async function handleChatSend() {
+    if (!chatInput.trim() || isTyping) return;
     const text = chatInput.trim();
     setChatInput('');
     setChatMessages((prev) => [...prev, { role: 'user', text }]);
     setIsTyping(true);
-    setTimeout(() => {
-      const reply = mockMentorReply(text, phase.id, currentLevelId, currentPage.id);
+    try {
+      const res = await fetch('/api/dify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          phase: phase.id,
+          levelId: currentLevelId,
+          interactionType: 'question',
+        }),
+      });
+      const data = await res.json();
+      const reply = data.reply || 'メンターから返答がありませんでした。';
       setChatMessages((prev) => [...prev, { role: 'assistant', text: reply }]);
+    } catch {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: 'メンターへの接続に失敗しました。もう一度お試しください。' },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 800 + Math.random() * 600);
+    }
+  }
+
+  async function handleSubmitAnswer() {
+    if (gradingPending || isCleared) return;
+
+    const lastUserMsg = [...chatMessages].reverse().find((m) => m.role === 'user')?.text;
+    if (!lastUserMsg) {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: 'まずメンターに「〇〇しました」と達成内容を伝えてから採点を依頼してください。' },
+      ]);
+      return;
+    }
+
+    setGradingPending(true);
+    setChatMessages((prev) => [
+      ...prev,
+      { role: 'user', text: `【採点依頼】${lastUserMsg}` },
+    ]);
+
+    try {
+      const res = await fetch('/api/dify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: lastUserMsg,
+          phase: phase.id,
+          levelId: currentLevelId,
+          interactionType: 'answer',
+        }),
+      });
+      const data = await res.json();
+      const reply: string = data.reply ?? '';
+
+      try {
+        const parsed = JSON.parse(reply);
+        if (parsed.is_cleared === true) {
+          setIsCleared(true);
+          setChatMessages((prev) => [
+            ...prev,
+            { role: 'assistant', text: `✅ 合格です！\n${parsed.feedback_message ?? ''}` },
+          ]);
+        } else {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              text: parsed.feedback_message ?? 'もう少し！内容を補足してから再提出してください。',
+            },
+          ]);
+        }
+      } catch {
+        // JSON以外（Dify未設定等）はそのまま表示
+        setChatMessages((prev) => [...prev, { role: 'assistant', text: reply || '採点結果を取得できませんでした。' }]);
+      }
+    } catch {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: '採点サービスへの接続に失敗しました。もう一度お試しください。' },
+      ]);
+    } finally {
+      setGradingPending(false);
+    }
   }
 
   const canProceed: boolean = (() => {
@@ -125,11 +218,11 @@ export function PhaseContent({ phase }: Props) {
     const out = currentPage as OutputPage;
     if (out.format === 'multiple-choice') return answered;
     if (out.format === 'short-answer') return answered;
-    if (out.format === 'chat') return chatMessages.length > 0;
+    if (out.format === 'chat') return isCleared; // AI採点でis_cleared: trueになるまで進めない
     return false;
   })();
 
-  if (isLoading || !user) {
+  if (isLoading || !user || isProgressLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
@@ -169,6 +262,7 @@ export function PhaseContent({ phase }: Props) {
             <div className="space-y-2">
               {phase.levels.map((level) => {
                 const lCleared = isLevelCleared(phase.id, level.id);
+                const lUnlocked = isLevelUnlocked(phase.id, level.id);
                 const lActive = level.id === currentLevelId;
                 const lPageCount = level.pages.length;
                 const lClearedPages =
@@ -179,22 +273,28 @@ export function PhaseContent({ phase }: Props) {
                   <div key={level.id}>
                     <button
                       onClick={() => goToLevel(level.id)}
+                      disabled={!lUnlocked}
                       className={`w-full rounded-xl p-3 text-left transition-colors ${
-                        lActive
+                        !lUnlocked
+                          ? 'border border-transparent opacity-40 cursor-not-allowed'
+                          : lActive
                           ? `${phase.borderColor} border bg-slate-800`
                           : 'border border-transparent hover:bg-slate-800/60'
                       }`}
                     >
                       <div className="flex items-center gap-2">
+                        {!lUnlocked && <span className="text-xs">🔒</span>}
                         <span className={`text-xs font-bold ${lActive ? phase.textColor : 'text-slate-500'}`}>
                           Level {level.id}
                         </span>
                         {lCleared && <span className="ml-auto text-xs">✅</span>}
                       </div>
                       <p className="mt-0.5 text-xs text-slate-400 line-clamp-2">{level.title}</p>
-                      <div className="mt-2">
-                        <Progress value={lPct} className="h-0.5 bg-slate-700" />
-                      </div>
+                      {lUnlocked && (
+                        <div className="mt-2">
+                          <Progress value={lPct} className="h-0.5 bg-slate-700" />
+                        </div>
+                      )}
                     </button>
 
                     {lActive && (
@@ -237,19 +337,25 @@ export function PhaseContent({ phase }: Props) {
           <div id="page-top" />
           {/* モバイルレベル切替 */}
           <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto border-b border-white/10 bg-slate-950/95 px-4 py-2 lg:hidden">
-            {phase.levels.map((level) => (
-              <button
-                key={level.id}
-                onClick={() => goToLevel(level.id)}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border ${
-                  level.id === currentLevelId
-                    ? `${phase.borderColor} ${phase.textColor} bg-slate-800`
-                    : 'border-white/10 text-slate-500'
-                }`}
-              >
-                {isLevelCleared(phase.id, level.id) ? '✅ ' : ''}Lv.{level.id}
-              </button>
-            ))}
+            {phase.levels.map((level) => {
+              const lUnlocked = isLevelUnlocked(phase.id, level.id);
+              return (
+                <button
+                  key={level.id}
+                  onClick={() => goToLevel(level.id)}
+                  disabled={!lUnlocked}
+                  className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border ${
+                    !lUnlocked
+                      ? 'border-white/5 text-slate-700 cursor-not-allowed'
+                      : level.id === currentLevelId
+                      ? `${phase.borderColor} ${phase.textColor} bg-slate-800`
+                      : 'border-white/10 text-slate-500'
+                  }`}
+                >
+                  {!lUnlocked ? '🔒 ' : isLevelCleared(phase.id, level.id) ? '✅ ' : ''}Lv.{level.id}
+                </button>
+              );
+            })}
           </div>
 
           <div className="mx-auto max-w-3xl px-4 py-6">
@@ -334,11 +440,14 @@ export function PhaseContent({ phase }: Props) {
                     chatMessages={chatMessages}
                     showHint={showHint}
                     isTyping={isTyping}
+                    isCleared={isCleared}
+                    gradingPending={gradingPending}
                     onSelectOption={handleMultipleChoice}
                     onShortAnswerChange={setShortAnswer}
                     onShortAnswerSubmit={handleShortAnswerSubmit}
                     onChatInputChange={setChatInput}
                     onChatSend={handleChatSend}
+                    onSubmitAnswer={handleSubmitAnswer}
                     onToggleHint={() => setShowHint((v) => !v)}
                   />
                 )}
@@ -559,11 +668,14 @@ type OutputProps = {
   chatMessages: { role: 'user' | 'assistant'; text: string }[];
   showHint: boolean;
   isTyping: boolean;
+  isCleared: boolean;
+  gradingPending: boolean;
   onSelectOption: (idx: number) => void;
   onShortAnswerChange: (val: string) => void;
   onShortAnswerSubmit: () => void;
   onChatInputChange: (val: string) => void;
   onChatSend: () => void;
+  onSubmitAnswer: () => void;
   onToggleHint: () => void;
 };
 
@@ -577,11 +689,14 @@ function OutputPageContent({
   chatMessages,
   showHint,
   isTyping,
+  isCleared,
+  gradingPending,
   onSelectOption,
   onShortAnswerChange,
   onShortAnswerSubmit,
   onChatInputChange,
   onChatSend,
+  onSubmitAnswer,
   onToggleHint,
 }: OutputProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -701,28 +816,48 @@ function OutputPageContent({
             )}
             <div ref={chatEndRef} />
           </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => onChatInputChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !isTyping && onChatSend()}
-              placeholder="メンターに話しかける... (Enterで送信)"
-              disabled={isTyping}
-              className="flex-1 rounded-xl border border-white/10 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
-            />
-            <Button
-              onClick={onChatSend}
-              disabled={!chatInput.trim() || isTyping}
-              className="bg-indigo-600 hover:bg-indigo-500"
-            >
-              送信
-            </Button>
-          </div>
-          {chatMessages.length > 0 && (
-            <p className="mt-2 text-xs text-slate-500">
-              AIメンターと会話できたら「次のページへ」ボタンで進めます。
-            </p>
+          {!isCleared && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => onChatInputChange(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !isTyping && !gradingPending && onChatSend()}
+                placeholder="メンターに話しかける... (Enterで送信)"
+                disabled={isTyping || gradingPending}
+                className="flex-1 rounded-xl border border-white/10 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
+              />
+              <Button
+                onClick={onChatSend}
+                disabled={!chatInput.trim() || isTyping || gradingPending}
+                className="bg-indigo-600 hover:bg-indigo-500"
+              >
+                送信
+              </Button>
+            </div>
+          )}
+
+          {/* 採点ボタン: 会話が始まっていて、まだ合格していない場合に表示 */}
+          {chatMessages.length > 0 && !isCleared && (
+            <div className="mt-3 border-t border-white/10 pt-3">
+              <p className="mb-2 text-xs text-slate-400">
+                課題を完了したら採点を依頼してください（最後に送ったメッセージが採点対象になります）
+              </p>
+              <Button
+                onClick={onSubmitAnswer}
+                disabled={gradingPending || isTyping}
+                className="w-full bg-emerald-600 text-sm hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {gradingPending ? '採点中...' : '✅ 採点してもらう'}
+              </Button>
+            </div>
+          )}
+
+          {/* 合格後メッセージ */}
+          {isCleared && (
+            <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+              ✅ 合格！下の「レベルをクリア」ボタンで次へ進みましょう。
+            </div>
           )}
         </div>
       )}
@@ -747,23 +882,3 @@ function OutputPageContent({
   );
 }
 
-// ============================================================
-// モックメンター応答
-// ============================================================
-function mockMentorReply(input: string, phaseId: number, levelId: number, pageId: number): string {
-  const lower = input.toLowerCase();
-  if (lower.includes('完了') || lower.includes('できました') || lower.includes('しました') || lower.includes('繋ぎ')) {
-    return `素晴らしいです！Phase ${phaseId} Level ${levelId} ページ${pageId}の内容を実践されたんですね。\n\n実際に手を動かすことで概念が体感として定着します。「次のページへ」ボタンを押して次へ進みましょう！何か気になった点があればいつでも聞いてください。`;
-  }
-  if (lower.includes('わからない') || lower.includes('教えて') || lower.includes('ヒント') || lower.includes('詰まっ')) {
-    const hints: Record<number, string> = {
-      1: 'まずcloud.dify.aiにアクセスして、「スタジオ」タブを開いてみましょう。+ボタンからアプリを作成できます。',
-      2: '開始ブロックの設定パネルを開くと「入力フィールドを追加」ボタンがあります。変数名はスペルミスに注意してください。',
-      3: '質問分類器ブロックを追加したら、各クラスの出口から別々のLLMブロックに矢印を繋いでみましょう。',
-      4: 'ナレッジ機能はサイドバーの「ナレッジ」から作成します。ドキュメントをアップロードしてから知識検索ブロックで参照します。',
-      5: '並列処理は同じブロックから複数の矢印を出します。変数集約器で結果をまとめることを忘れずに。',
-    };
-    return hints[phaseId] || 'もう少し詳しく教えてもらえますか？どの操作でつまずいているか教えていただければ、より具体的なアドバイスができます。';
-  }
-  return `なるほど！Phase ${phaseId}のLevel ${levelId}について教えてくれてありがとうございます。\n\nDifyは実際に手を動かすことが上達の近道です。もし詰まったら具体的に「〇〇の操作で困っている」と教えてください。一緒に解決しましょう！\n\n課題が完了したら「次のページへ」を押して進みましょう。`;
-}

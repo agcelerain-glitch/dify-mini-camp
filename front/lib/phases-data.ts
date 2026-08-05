@@ -4,7 +4,7 @@
 // ロック機能: LOCK_ENABLED を true にすることで有効化（Supabase連携時）
 // ============================================================
 
-export const LOCK_ENABLED = false;
+export const LOCK_ENABLED = true;
 
 // -------- 型定義 --------
 
