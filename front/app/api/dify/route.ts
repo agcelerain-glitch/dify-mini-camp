@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify({
       query: message,
       inputs: {
+        sys_query: message,
         current_phase: String(phase),
         current_level: String(levelId),
         interaction_type: interactionType,
