@@ -18,7 +18,7 @@ type Props = { phase: Phase };
 
 export function PhaseContent({ phase }: Props) {
   const { user, isLoading } = useAuth();
-  const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, isPageUnlocked, completePage, completeLevel } = useProgress();
+  const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, isPageUnlocked, getPhaseProgress, getLevelProgress, completePage, completeLevel } = useProgress();
   const router = useRouter();
 
   const [currentLevelId, setCurrentLevelId] = useState(1);
@@ -67,9 +67,7 @@ export function PhaseContent({ phase }: Props) {
   // currentPage オブジェクト参照ではなくインデックスを依存にして必ず再シャッフル
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPageIndex, currentLevelId]);
-  const levelProgress = Math.round(
-    ((progress.phases[phase.id]?.levels[currentLevelId]?.clearedPages.length ?? 0) / totalPages) * 100,
-  );
+  const levelProgress = getLevelProgress(phase.id, currentLevelId);
 
   function scrollTop() {
     contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -232,10 +230,7 @@ export function PhaseContent({ phase }: Props) {
     );
   }
 
-  const phaseAllClearedLevels = Object.values(progress.phases[phase.id]?.levels ?? {}).filter(
-    (l) => l.clearedAt,
-  ).length;
-  const phaseProgress = Math.round((phaseAllClearedLevels / phase.levels.length) * 100);
+  const phaseProgress = getPhaseProgress(phase.id);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950">
@@ -266,10 +261,7 @@ export function PhaseContent({ phase }: Props) {
                 const lCleared = isLevelCleared(phase.id, level.id);
                 const lUnlocked = isLevelUnlocked(phase.id, level.id);
                 const lActive = level.id === currentLevelId;
-                const lPageCount = level.pages.length;
-                const lClearedPages =
-                  progress.phases[phase.id]?.levels[level.id]?.clearedPages.length ?? 0;
-                const lPct = Math.round((lClearedPages / lPageCount) * 100);
+                const lPct = getLevelProgress(phase.id, level.id);
 
                 return (
                   <div key={level.id}>

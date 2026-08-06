@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
   }
 
   const difyData = await difyRes.json();
+  console.log('Dify response keys:', Object.keys(difyData));
+  console.log('Dify answer:', difyData?.answer);
   // チャットフローのレスポンスは answer フィールドに入る
   const reply = difyData?.answer ?? '';
   const newConversationId = difyData?.conversation_id ?? '';

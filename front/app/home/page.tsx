@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
-  const { progress, isPhaseCleared, isPhaseUnlocked, isLevelCleared, resetAll } = useProgress();
+  const { progress, isPhaseCleared, isPhaseUnlocked, getPhaseProgress, resetAll } = useProgress();
   const router = useRouter();
 
   useEffect(() => {
@@ -27,14 +27,6 @@ export default function HomePage() {
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
       </div>
     );
-  }
-
-  function getPhaseProgress(phaseId: number): number {
-    const phase = PHASES.find((p) => p.id === phaseId);
-    if (!phase) return 0;
-    const totalLevels = phase.levels.length;
-    const clearedLevels = phase.levels.filter((l) => isLevelCleared(phaseId, l.id)).length;
-    return Math.round((clearedLevels / totalLevels) * 100);
   }
 
   const clearedPhases = PHASES.filter((p) => isPhaseCleared(p.id)).length;

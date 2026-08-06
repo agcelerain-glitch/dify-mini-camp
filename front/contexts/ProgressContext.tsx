@@ -21,6 +21,8 @@ type ProgressContextType = {
   isLevelCleared: (phaseId: number, levelId: number) => boolean;
   isPageCleared: (phaseId: number, levelId: number, pageId: number) => boolean;
   isPageUnlocked: (phaseId: number, levelId: number, pageId: number) => boolean;
+  getPhaseProgress: (phaseId: number) => number;
+  getLevelProgress: (phaseId: number, levelId: number) => number;
   completePage: (phaseId: number, levelId: number, pageId: number) => void;
   completeLevel: (phaseId: number, levelId: number) => void;
   completePhase: (phaseId: number) => void;
@@ -92,6 +94,21 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     if (!LOCK_ENABLED) return true;
     if (pageId === 1) return true;
     return isPageCleared(phaseId, levelId, pageId - 1);
+  }
+
+  function getPhaseProgress(phaseId: number): number {
+    const phase = PHASES.find((p) => p.id === phaseId);
+    if (!phase) return 0;
+    const clearedLevels = phase.levels.filter((l) => isLevelCleared(phaseId, l.id)).length;
+    return Math.round((clearedLevels / phase.levels.length) * 100);
+  }
+
+  function getLevelProgress(phaseId: number, levelId: number): number {
+    const phase = PHASES.find((p) => p.id === phaseId);
+    const level = phase?.levels.find((l) => l.id === levelId);
+    if (!level) return 0;
+    const clearedPages = progress.phases[phaseId]?.levels[levelId]?.clearedPages.length ?? 0;
+    return Math.round((clearedPages / level.pages.length) * 100);
   }
 
   function completePage(phaseId: number, levelId: number, pageId: number) {
@@ -209,6 +226,8 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         isLevelCleared,
         isPageCleared,
         isPageUnlocked,
+        getPhaseProgress,
+        getLevelProgress,
         completePage,
         completeLevel,
         completePhase,
