@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
-  // ログイン済みユーザーのみ許可
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,7 +12,13 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { message, phase = 1, levelId = 1, interactionType = 'question' } = body;
+  const {
+    message,
+    phase = 1,
+    levelId = 1,
+    interactionType = 'question',
+    conversationId,
+  } = body;
 
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'message is required' }, { status: 400 });
@@ -26,21 +31,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Dify API key not configured' }, { status: 500 });
   }
 
-  const difyRes = await fetch(`${apiUrl}/workflows/run`, {
+  const difyRes = await fetch(`${apiUrl}/chat-messages`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      query: message,
       inputs: {
-        sys_query: message,
         current_phase: String(phase),
         current_level: String(levelId),
         interaction_type: interactionType,
       },
       response_mode: 'blocking',
       user: user.id,
+      conversation_id: conversationId ?? '',
     }),
   });
 
@@ -54,10 +60,9 @@ export async function POST(request: NextRequest) {
   }
 
   const difyData = await difyRes.json();
-  const outputs = difyData?.data?.outputs ?? {};
-  // Difyワークフローの出力変数名に合わせてフォールバック
-  const reply =
-    outputs.text ?? outputs.answer ?? outputs.output ?? outputs.result ?? '';
+  // チャットフローのレスポンスは answer フィールドに入る
+  const reply = difyData?.answer ?? '';
+  const newConversationId = difyData?.conversation_id ?? '';
 
-  return NextResponse.json({ reply });
+  return NextResponse.json({ reply, conversationId: newConversationId });
 }

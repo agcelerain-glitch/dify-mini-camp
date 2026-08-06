@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
-  const { progress, isPhaseCleared, isLevelCleared, resetAll } = useProgress();
+  const { progress, isPhaseCleared, isPhaseUnlocked, isLevelCleared, resetAll } = useProgress();
   const router = useRouter();
 
   useEffect(() => {
@@ -137,20 +137,18 @@ export default function HomePage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PHASES.map((phase) => {
               const cleared = isPhaseCleared(phase.id);
+              const unlocked = isPhaseUnlocked(phase.id);
               const isCurrent = phase.id === currentPhase;
               const pct = getPhaseProgress(phase.id);
 
-              return (
-                <Link
-                  key={phase.id}
-                  href={`/camp/${phase.id}`}
-                  className={`relative rounded-xl border p-4 transition-all cursor-pointer ${
-                    phase.borderColor
-                  } bg-slate-900 hover:bg-slate-800 ${isCurrent ? 'ring-1 ring-indigo-500/50' : ''}`}
-                >
-                  {cleared && (
-                    <span className="absolute right-3 top-3 text-lg">✅</span>
-                  )}
+              const cardContent = (
+                <div className={`relative rounded-xl border p-4 transition-all ${
+                  phase.borderColor
+                } ${unlocked ? 'bg-slate-900 hover:bg-slate-800 cursor-pointer' : 'bg-slate-900/50 opacity-60 cursor-not-allowed'} ${
+                  isCurrent && unlocked ? 'ring-1 ring-indigo-500/50' : ''
+                }`}>
+                  {cleared && <span className="absolute right-3 top-3 text-lg">✅</span>}
+                  {!unlocked && <span className="absolute right-3 top-3 text-lg">🔒</span>}
                   <p className="mb-1 text-xs text-slate-500">{phase.subtitle}</p>
                   <p className="font-semibold text-white">
                     {phase.icon} {phase.title}
@@ -159,6 +157,9 @@ export default function HomePage() {
                     <Badge className={`text-xs ${phase.badgeBg}`}>{phase.difficultyLabel}</Badge>
                     <span className="text-xs text-slate-500">{phase.duration}</span>
                   </div>
+                  {!unlocked && (
+                    <p className="mt-2 text-xs text-slate-600">前のフェーズをクリアしてください</p>
+                  )}
                   <div className="mt-3">
                     <div className="mb-0.5 flex justify-between text-xs text-slate-600">
                       <span>{phase.levels.length} レベル</span>
@@ -166,7 +167,15 @@ export default function HomePage() {
                     </div>
                     <Progress value={pct} className="h-1 bg-slate-700" />
                   </div>
+                </div>
+              );
+
+              return unlocked ? (
+                <Link key={phase.id} href={`/camp/${phase.id}`}>
+                  {cardContent}
                 </Link>
+              ) : (
+                <div key={phase.id}>{cardContent}</div>
               );
             })}
           </div>

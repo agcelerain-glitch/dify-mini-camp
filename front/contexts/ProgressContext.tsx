@@ -20,6 +20,7 @@ type ProgressContextType = {
   isPhaseCleared: (phaseId: number) => boolean;
   isLevelCleared: (phaseId: number, levelId: number) => boolean;
   isPageCleared: (phaseId: number, levelId: number, pageId: number) => boolean;
+  isPageUnlocked: (phaseId: number, levelId: number, pageId: number) => boolean;
   completePage: (phaseId: number, levelId: number, pageId: number) => void;
   completeLevel: (phaseId: number, levelId: number) => void;
   completePhase: (phaseId: number) => void;
@@ -85,6 +86,12 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
 
   function isPageCleared(phaseId: number, levelId: number, pageId: number): boolean {
     return progress.phases[phaseId]?.levels[levelId]?.clearedPages.includes(pageId) ?? false;
+  }
+
+  function isPageUnlocked(phaseId: number, levelId: number, pageId: number): boolean {
+    if (!LOCK_ENABLED) return true;
+    if (pageId === 1) return true;
+    return isPageCleared(phaseId, levelId, pageId - 1);
   }
 
   function completePage(phaseId: number, levelId: number, pageId: number) {
@@ -201,6 +208,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         isPhaseCleared,
         isLevelCleared,
         isPageCleared,
+        isPageUnlocked,
         completePage,
         completeLevel,
         completePhase,

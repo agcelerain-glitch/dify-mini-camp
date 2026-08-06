@@ -31,6 +31,7 @@ export function ChatbotButton() {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [levelUpCandidate, setLevelUpCandidate] = useState<LevelUpCandidate | null>(null);
+  const [conversationId, setConversationId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { progress, completeLevel } = useProgress();
   const { user } = useAuth();
@@ -69,11 +70,13 @@ export function ChatbotButton() {
           phase: currentPhase,
           levelId: currentLevel,
           interactionType: 'question',
+          conversationId,
         }),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
       const reply: string = data.reply ?? '';
+      if (data.conversationId) setConversationId(data.conversationId);
 
       // 質問分類器が課題提出と判定した場合、採点JSONが返ることがある
       try {

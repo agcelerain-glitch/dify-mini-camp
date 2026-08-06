@@ -18,7 +18,7 @@ type Props = { phase: Phase };
 
 export function PhaseContent({ phase }: Props) {
   const { user, isLoading } = useAuth();
-  const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, completePage, completeLevel } = useProgress();
+  const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, isPageUnlocked, completePage, completeLevel } = useProgress();
   const router = useRouter();
 
   const [currentLevelId, setCurrentLevelId] = useState(1);
@@ -95,6 +95,8 @@ export function PhaseContent({ phase }: Props) {
   }
 
   function goToPage(index: number) {
+    const page = currentLevel.pages[index];
+    if (!isPageUnlocked(phase.id, currentLevelId, page.id)) return;
     setCurrentPageIndex(index);
     resetPageState();
     scrollTop();
@@ -302,12 +304,16 @@ export function PhaseContent({ phase }: Props) {
                         {level.pages.map((page, idx) => {
                           const pCleared = isPageCleared(phase.id, level.id, page.id);
                           const pActive = idx === currentPageIndex;
+                          const pUnlocked = isPageUnlocked(phase.id, level.id, page.id);
                           return (
                             <button
                               key={page.id}
                               onClick={() => goToPage(idx)}
+                              disabled={!pUnlocked}
                               className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${
-                                pActive
+                                !pUnlocked
+                                  ? 'text-slate-700 cursor-not-allowed'
+                                  : pActive
                                   ? `${phase.textColor} bg-slate-800 font-medium`
                                   : pCleared
                                   ? 'text-slate-400 hover:bg-slate-800'
@@ -315,7 +321,7 @@ export function PhaseContent({ phase }: Props) {
                               }`}
                             >
                               <span>
-                                {pCleared ? '✅' : page.type === 'input' ? '📖' : '✏️'}
+                                {!pUnlocked ? '🔒' : pCleared ? '✅' : page.type === 'input' ? '📖' : '✏️'}
                               </span>
                               <span className="line-clamp-1">
                                 P{page.id}. {page.title}
@@ -388,19 +394,23 @@ export function PhaseContent({ phase }: Props) {
                 {currentLevel.pages.map((page, idx) => {
                   const pCleared = isPageCleared(phase.id, currentLevelId, page.id);
                   const pActive = idx === currentPageIndex;
+                  const pUnlocked = isPageUnlocked(phase.id, currentLevelId, page.id);
                   return (
                     <button
                       key={page.id}
                       onClick={() => goToPage(idx)}
+                      disabled={!pUnlocked}
                       className={`shrink-0 flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                        pActive
+                        !pUnlocked
+                          ? 'border-white/5 text-slate-700 cursor-not-allowed'
+                          : pActive
                           ? `${phase.borderColor} ${phase.textColor} bg-slate-800 font-medium`
                           : pCleared
                           ? 'border-white/10 text-slate-400 hover:bg-slate-800'
                           : 'border-white/5 text-slate-600 hover:bg-slate-800/50'
                       }`}
                     >
-                      {pCleared && !pActive ? '✅ ' : page.type === 'input' ? '📖 ' : '✏️ '}
+                      {!pUnlocked ? '🔒 ' : pCleared && !pActive ? '✅ ' : page.type === 'input' ? '📖 ' : '✏️ '}
                       ページ{page.id}
                     </button>
                   );
