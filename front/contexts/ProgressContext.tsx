@@ -64,7 +64,15 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   function isLevelUnlocked(phaseId: number, levelId: number): boolean {
     if (!LOCK_ENABLED) return true;
     if (levelId === 1) return true;
-    return !!progress.phases[phaseId]?.levels[levelId - 1]?.clearedAt;
+
+    const phaseLevels = progress.phases[phaseId]?.levels ?? {};
+    // コンテンツが途中挿入された場合でも対応できるよう、
+    // そのフェーズでクリアした最高レベルIDを基準にする
+    const maxClearedLevelId = Object.entries(phaseLevels)
+      .filter(([, lv]) => !!lv.clearedAt)
+      .reduce((max, [id]) => Math.max(max, Number(id)), 0);
+
+    return maxClearedLevelId >= levelId - 1;
   }
 
   function isPhaseCleared(phaseId: number): boolean {

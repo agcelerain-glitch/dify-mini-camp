@@ -1,21 +1,23 @@
-'use client';
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export default async function AuthCallbackPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const code = typeof params.code === 'string' ? params.code : null;
+  const error = typeof params.error === 'string' ? params.error : null;
 
-export default function AuthCallbackPage() {
-  const router = useRouter();
+  if (error) {
+    redirect(`/?error=${encodeURIComponent(error)}`);
+  }
 
-  useEffect(() => {
-    router.replace('/home');
-  }, [router]);
+  if (code) {
+    const supabase = await createClient();
+    await supabase.auth.exchangeCodeForSession(code);
+  }
 
-  return (
-    <div className="flex h-screen items-center justify-center bg-slate-950">
-      <div className="text-center">
-        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-        <p className="text-slate-400">ログイン処理中...</p>
-      </div>
-    </div>
-  );
+  redirect('/home');
 }

@@ -1,12 +1,33 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getMockUser, setMockUser, clearMockUser, MockUser } from '@/lib/mock-store';
+import { createClient } from '@/lib/supabase/client';
+
+export type AppUser = {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+};
+
+function toAppUser(supabaseUser: { id: string; email?: string; user_metadata?: Record<string, string> }): AppUser {
+  const name =
+    supabaseUser.user_metadata?.full_name ??
+    supabaseUser.user_metadata?.name ??
+    supabaseUser.email?.split('@')[0] ??
+    'User';
+  return {
+    id: supabaseUser.id,
+    name,
+    email: supabaseUser.email ?? '',
+    avatar: name.charAt(0).toUpperCase(),
+  };
+}
 
 type AuthContextType = {
-  user: MockUser | null;
+  user: AppUser | null;
   isLoading: boolean;
-  signIn: (name?: string) => void;
+  signIn: () => void;
   signOut: () => void;
 };
 
@@ -18,28 +39,41 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<MockUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = getMockUser();
-    setUser(stored);
-    setIsLoading(false);
+    const supabase = createClient();
+
+    // 初期セッション取得
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      setUser(u ? toAppUser(u) : null);
+      setIsLoading(false);
+    });
+
+    // 認証状態の変更を監視
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? toAppUser(session.user) : null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  function signIn(name = 'テストユーザー') {
-    const mockUser: MockUser = {
-      id: 'mock-user-001',
-      name,
-      email: 'test@example.com',
-      avatar: name.charAt(0).toUpperCase(),
-    };
-    setMockUser(mockUser);
-    setUser(mockUser);
+  function signIn() {
+    const supabase = createClient();
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
   }
 
-  function signOut() {
-    clearMockUser();
+  async function signOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
     setUser(null);
   }
 

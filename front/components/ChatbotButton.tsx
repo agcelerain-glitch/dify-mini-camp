@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useProgress } from '@/contexts/ProgressContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Message = {
   id: number;
@@ -10,48 +11,11 @@ type Message = {
   content: string;
 };
 
-const MENTOR_RESPONSES: Record<string, string> = {
-  default:
-    'こんにちは！Dify mini Campのメンターです。Difyについて何でも聞いてください。また、課題が完了したら「フェーズX、レベルXを完了しました」と報告してください！',
-  hello:
-    'こんにちは！今日も学習を頑張りましょう！現在のフェーズで困っていることがあれば、何でも聞いてください。',
-  help: 'Difyについて質問があればお答えします。また、各フェーズの課題でわからないことがあれば具体的に教えてください。',
+type LevelUpCandidate = {
+  phaseId: number;
+  levelId: number;
+  feedbackMessage: string;
 };
-
-function getMentorReply(input: string, currentPhase: number): string {
-  const lower = input.toLowerCase();
-
-  if (lower.includes('こんにちは') || lower.includes('hello') || lower.includes('はじめまして')) {
-    return MENTOR_RESPONSES.hello;
-  }
-
-  if (
-    lower.includes('完了') ||
-    lower.includes('クリア') ||
-    lower.includes('できました') ||
-    lower.includes('しました')
-  ) {
-    return `素晴らしいです！Phase ${currentPhase}の学習を進めているんですね。しっかりと理解できているか確認させてください。何を達成しましたか？具体的に教えていただけると、より的確なフィードバックができます！`;
-  }
-
-  if (lower.includes('わからない') || lower.includes('むずかしい') || lower.includes('難しい')) {
-    return `大丈夫ですよ！Phase ${currentPhase}は最初は難しく感じることもあります。どの部分でつまずいていますか？もっと具体的に教えてください。一緒に解決しましょう！`;
-  }
-
-  if (lower.includes('dify') && lower.includes('ブロック')) {
-    return 'Difyのブロックについてですね！基本のブロックは「開始」「LLM」「回答」の3つです。これらをつなぐことで基本的なAIフローが完成します。もっと詳しく知りたいことはありますか？';
-  }
-
-  if (lower.includes('変数') || lower.includes('{{')) {
-    return '変数は {{変数名}} の形式で参照します。開始ブロックで変数を定義してから、LLMブロックのプロンプト内で参照できます。実際に試してみましたか？';
-  }
-
-  if (lower.includes('rag') || lower.includes('ナレッジ') || lower.includes('知識検索')) {
-    return 'RAG（検索拡張生成）はDifyのナレッジ機能で実現できます。ドキュメントをアップロードして、「知識検索」ブロックで検索し、その結果をLLMに渡す流れです。Phase 4で詳しく学べますよ！';
-  }
-
-  return `なるほど、興味深い質問ですね！Phase ${currentPhase}の学習と合わせて、ぜひDifyで実際に試してみてください。「やってみてわからなかったこと」があれば、また教えてください。一緒に考えましょう！`;
-}
 
 export function ChatbotButton() {
   const [isOpen, setIsOpen] = useState(false);
@@ -65,35 +29,112 @@ export function ChatbotButton() {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [levelUpCandidate, setLevelUpCandidate] = useState<LevelUpCandidate | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { progress } = useProgress();
+  const { progress, completeLevel } = useProgress();
+  const { user } = useAuth();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  function handleSend() {
-    if (!input.trim()) return;
+  // 現在フェーズで取り組み中のレベルを計算
+  function getCurrentLevelForPhase(phaseId: number): number {
+    const phaseLevels = progress.phases[phaseId]?.levels ?? {};
+    const maxCleared = Object.entries(phaseLevels)
+      .filter(([, lv]) => !!lv.clearedAt)
+      .reduce((max, [id]) => Math.max(max, Number(id)), 0);
+    return maxCleared + 1;
+  }
 
-    const userMessage: Message = {
-      id: messages.length,
-      role: 'user',
-      content: input,
-    };
-    setMessages((prev) => [...prev, userMessage]);
+  async function handleSend() {
+    if (!input.trim() || isTyping) return;
+
+    const text = input.trim();
     setInput('');
+    setError(null);
+    setMessages((prev) => [...prev, { id: prev.length, role: 'user', content: text }]);
     setIsTyping(true);
 
-    setTimeout(() => {
-      const reply = getMentorReply(input, progress.currentPhase);
-      const assistantMessage: Message = {
-        id: messages.length + 1,
-        role: 'assistant',
-        content: reply,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+    const currentPhase = progress.currentPhase;
+    const currentLevel = getCurrentLevelForPhase(currentPhase);
+
+    try {
+      const res = await fetch('/api/dify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          phase: currentPhase,
+          levelId: currentLevel,
+          interactionType: 'question',
+        }),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data = await res.json();
+      const reply: string = data.reply ?? '';
+
+      // 質問分類器が課題提出と判定した場合、採点JSONが返ることがある
+      try {
+        const parsed = JSON.parse(reply);
+        if (parsed.is_cleared === true) {
+          const feedback = parsed.feedback_message ?? '合格と判定されました！';
+          setMessages((prev) => [
+            ...prev,
+            { id: prev.length, role: 'assistant', content: `✅ ${feedback}` },
+          ]);
+          setLevelUpCandidate({ phaseId: currentPhase, levelId: currentLevel, feedbackMessage: feedback });
+        } else if (parsed.is_cleared === false) {
+          setMessages((prev) => [
+            ...prev,
+            { id: prev.length, role: 'assistant', content: parsed.feedback_message ?? 'もう少し！' },
+          ]);
+        } else {
+          // is_cleared フィールドがない通常のJSONはそのまま表示
+          setMessages((prev) => [
+            ...prev,
+            { id: prev.length, role: 'assistant', content: reply || 'メンターから返答がありませんでした。' },
+          ]);
+        }
+      } catch {
+        // JSON以外（通常の会話）はそのまま表示
+        setMessages((prev) => [
+          ...prev,
+          { id: prev.length, role: 'assistant', content: reply || 'メンターから返答がありませんでした。' },
+        ]);
+      }
+    } catch {
+      setError('メンターへの接続に失敗しました。もう一度お試しください。');
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }
+  }
+
+  function handleConfirmLevelUp() {
+    if (!levelUpCandidate) return;
+    completeLevel(levelUpCandidate.phaseId, levelUpCandidate.levelId);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: prev.length,
+        role: 'assistant',
+        content: `🎉 Level ${levelUpCandidate.levelId} クリア！進捗が保存されました。次のレベルへ進みましょう！`,
+      },
+    ]);
+    setLevelUpCandidate(null);
+  }
+
+  function handleCancelLevelUp() {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: prev.length,
+        role: 'assistant',
+        content: 'わかりました。レベルアップをキャンセルしました。引き続き学習を続けましょう！',
+      },
+    ]);
+    setLevelUpCandidate(null);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -102,6 +143,8 @@ export function ChatbotButton() {
       handleSend();
     }
   }
+
+  if (!user) return null;
 
   return (
     <>
@@ -114,7 +157,7 @@ export function ChatbotButton() {
       </button>
 
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 flex h-[500px] w-[360px] flex-col rounded-2xl border border-white/10 bg-slate-900 shadow-2xl shadow-black/50">
+        <div className="fixed bottom-24 right-6 z-50 flex h-[520px] w-[360px] flex-col rounded-2xl border border-white/10 bg-slate-900 shadow-2xl shadow-black/50">
           <div className="flex items-center gap-3 rounded-t-2xl border-b border-white/10 bg-indigo-600/20 px-4 py-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm">
               🤖
@@ -154,6 +197,39 @@ export function ChatbotButton() {
                 </div>
               </div>
             )}
+            {error && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                {error}
+              </div>
+            )}
+
+            {/* レベルアップ確認ダイアログ */}
+            {levelUpCandidate && (
+              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 space-y-2">
+                <p className="text-xs font-semibold text-emerald-300">
+                  🎓 Level {levelUpCandidate.levelId} クリアと判定されました！
+                </p>
+                <p className="text-xs text-slate-400">レベルアップして進捗を保存しますか？</p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleConfirmLevelUp}
+                    size="sm"
+                    className="flex-1 bg-emerald-600 text-xs hover:bg-emerald-500"
+                  >
+                    ✅ レベルアップ
+                  </Button>
+                  <Button
+                    onClick={handleCancelLevelUp}
+                    size="sm"
+                    variant="ghost"
+                    className="flex-1 text-xs text-slate-400 hover:text-white"
+                  >
+                    後で
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
