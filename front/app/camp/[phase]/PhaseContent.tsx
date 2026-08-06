@@ -103,7 +103,12 @@ export function PhaseContent({ phase }: Props) {
   function handleNext() {
     completePage(phase.id, currentLevelId, currentPage.id);
     if (currentPageIndex < totalPages - 1) {
-      goToPage(currentPageIndex + 1);
+      // goToPage は isPageUnlocked を参照するが、completePage 直後は
+      // setProgress の再レンダリングが完了していないため古いstateを見てしまう。
+      // ここでは明示的に「次へ進む」操作なのでロックチェックを省いて直接遷移する。
+      setCurrentPageIndex(currentPageIndex + 1);
+      resetPageState();
+      scrollTop();
     } else {
       completeLevel(phase.id, currentLevelId);
     }
@@ -138,8 +143,19 @@ export function PhaseContent({ phase }: Props) {
         }),
       });
       const data = await res.json();
-      const reply = data.reply || 'メンターから返答がありませんでした。';
-      setChatMessages((prev) => [...prev, { role: 'assistant', text: reply }]);
+      const rawReply = data.reply || 'メンターから返答がありませんでした。';
+      // DifyがJSON形式で返した場合はfeedback_messageのみ表示
+      let displayText = rawReply;
+      try {
+        const parsed = JSON.parse(rawReply);
+        if (parsed.feedback_message) displayText = parsed.feedback_message;
+        // 質問モードで採点結果が返った場合はクリア判定も処理する
+        if (parsed.is_cleared === true) {
+          setIsCleared(true);
+          displayText = `✅ 合格です！\n${parsed.feedback_message ?? ''}`;
+        }
+      } catch { /* JSON以外はそのまま */ }
+      setChatMessages((prev) => [...prev, { role: 'assistant', text: displayText }]);
     } catch {
       setChatMessages((prev) => [
         ...prev,
