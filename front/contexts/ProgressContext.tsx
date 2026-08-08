@@ -68,6 +68,9 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     if (!LOCK_ENABLED) return true;
     // クリア済みのレベルは常にアンロック（コンテンツ追加後も影響なし）
     if (isLevelCleared(phaseId, levelId)) return true;
+    // currentPhase がこのフェーズを超えている = フェーズ全体を完了済み
+    // level_cleared_at が DB に未保存でも全レベルを復習アクセス可能にする
+    if (progress.currentPhase > phaseId) return true;
 
     const phase = PHASES.find((p) => p.id === phaseId);
     if (!phase) return false;
