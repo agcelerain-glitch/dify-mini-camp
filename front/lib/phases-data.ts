@@ -49,7 +49,8 @@
 //   Phase 4  Level 1 : 使用済み={1,2,3,4,5,6,7}(max=7) → 次ページID: 8
 //   Phase 4  Level 2 : 使用済み={1,2,3,4,5,6}         → 次ページID: 7
 //   Phase 4  Level 3 : 使用済み={1,2,3,4,5}           → 次ページID: 6
-//   Phase 4           使用済みレベルID={1,2,3}         → 次レベルID: 4
+//   Phase 4  Level 4 : 使用済み={1,2,3,4,5,6}         → 次ページID: 7
+//   Phase 4           使用済みレベルID={1,2,3,4}       → 次レベルID: 5
 //
 //   Phase 5  Level 1 : 使用済み={1,2,3,4,5,6}         → 次ページID: 7
 //   Phase 5  Level 2 : 使用済み={1,2,3,4,5,6}         → 次ページID: 7
@@ -2514,6 +2515,194 @@ def main(price: float, quantity: int) -> dict:
           format: 'chat',
           hint: 'まずシンプルに「2つの数値を受け取って足し算した結果を返す」だけでも構いません。動いてから少しずつ複雑にしていきましょう。',
           hint2: '例: ①消費税込みの合計金額を計算 ②price・quantityを入力、total・messageを出力 ③辞書のキー名を出力変数名と揃える必要があると気づいた',
+        },
+      ],
+    },
+    // ---- Level 4 ----
+    {
+      id: 4,
+      title: 'HTTPリクエストノードで外部APIと連携する',
+      description: '外部のWeb APIをDifyワークフローに組み込み、リアルタイムデータ取得・Webhook送信・ファイル処理を実現する',
+      estimatedTime: '50分',
+      pages: [
+        {
+          id: 1,
+          type: 'input',
+          title: 'HTTPリクエストノードの基本と使いどころ',
+          content: `## HTTPリクエストノードとは？
+
+**HTTPリクエストノード**は、Difyのワークフローから外部のWeb APIに接続するためのノードです。コードを書かずにGUI操作だけで外部サービスと通信できます。
+
+---
+
+## 主な用途
+
+- **データ取得**: 天気予報API・為替レートAPI・ニュースAPIなどからリアルタイム情報を取得
+- **Webhook送信**: Slack・LINE・Discord・Notion などのサービスに通知を送信
+- **ファイル操作**: 外部ストレージへのアップロード、画像・PDFのダウンロード
+- **自社API連携**: 社内DBや既存システムのAPIとDifyフローを繋ぐ
+
+---
+
+## サポートするHTTPメソッド
+
+| メソッド | 用途 |
+|---------|------|
+| **GET** | データの取得（検索・参照） |
+| **POST** | データの送信・作成（メッセージ送信・フォーム投稿） |
+| **PUT** | データの完全な置き換え |
+| **PATCH** | データの部分的な更新 |
+| **DELETE** | データの削除 |
+| **HEAD** | レスポンスヘッダーのみ取得（ボディなし） |
+
+---
+
+## 変数の埋め込み方
+
+URLやヘッダー・ボディの値に、上流ノードで定義した変数を \`{{変数名}}\` の記法で埋め込めます。
+
+\`\`\`
+# 例：開始ノードの city 変数を URL に使う
+https://api.weather.example.com/forecast?location={{city}}
+\`\`\`
+
+---
+
+## 出力変数（4種類）
+
+| 変数名 | 型 | 内容 |
+|--------|----|------|
+| **body** | 文字列 | レスポンスボディ（JSON等） |
+| **status_code** | 数値 | HTTPステータスコード（200・404・500 等） |
+| **headers** | オブジェクト | レスポンスヘッダー |
+| **files** | ファイル | レスポンスにファイルが含まれる場合 |
+
+> ⚠️ \`body\` は **文字列型** です。JSONレスポンスの特定フィールドを取り出すには、後続のコード実行ノードで \`json.loads()\` を使って辞書型に変換する必要があります。`,
+          keyPoints: [
+            'HTTPリクエストノードはGUI操作だけで外部APIと通信できる',
+            'URL・ヘッダー・ボディに {{変数名}} で上流ノードの値を埋め込める',
+            '出力の body は文字列型のため、JSONパースにはコード実行ノードが必要',
+          ],
+        },
+        {
+          id: 2,
+          type: 'output',
+          title: '確認クイズ：JSONレスポンスの活用方法',
+          question: 'HTTPリクエストノードで外部APIを呼び出したところ、以下のJSONが `body` として返ってきました。`"temperature"` の値だけを取り出して後続のLLMブロックに渡す、正しい実装はどれですか？\n\n```json\n{"location":"Tokyo","temperature":28,"unit":"Celsius"}\n```',
+          format: 'multiple-choice',
+          options: [
+            { label: 'コード実行ノードを接続し、Python で json.loads(body)["temperature"] として取り出してからLLMブロックに渡す', isCorrect: true },
+            { label: 'LLMブロックのプロンプトに {{body.temperature}} と書けば自動的に28が渡される', isCorrect: false },
+            { label: 'テンプレートノードに {{body | jsonpath: "$.temperature"}} と書けば値を抽出できる', isCorrect: false },
+            { label: 'HTTPリクエストノードの設定画面で「JSONフィールド抽出」に temperature を指定すれば出力変数として自動追加される', isCorrect: false },
+          ],
+          hint: 'body の型は「文字列」です。{{body.temperature}} のようなドット記法でJSONフィールドに直接アクセスはできません。文字列→辞書への変換には json.loads() が必要で、コード実行ノードで前処理してからLLMブロックに渡すのが正解です。テンプレートノードにjsonpath記法はなく、HTTPリクエストノードにも自動フィールド抽出機能はありません。',
+        },
+        {
+          id: 3,
+          type: 'input',
+          title: '認証・ボディ・セキュリティの詳細設定',
+          content: `## 認証（Authorization）の設定
+
+HTTPリクエストノードは、APIの認証方式に合わせて4種類から選べます。
+
+| タイプ | 仕組み | 主な用途 |
+|--------|--------|---------|
+| **No Auth** | 認証なし | 公開API（天気・為替など） |
+| **API Key** | カスタムヘッダー名と値を指定 | X-API-Key ヘッダーを要求するAPI |
+| **Bearer Token** | \`Authorization: Bearer <token>\` を自動付与 | OpenAI API・多くのSaaS API |
+| **Basic Auth** | ユーザー名+パスワードをBase64エンコード | 旧来のサーバーシステム |
+
+---
+
+## APIキーのセキュアな使い方
+
+APIキーをノードに直接入力すると、フロー設定を閲覧できる人に漏洩するリスクがあります。
+Difyの「**環境変数**」に登録し、\`{{ENV.変数名}}\` で参照するのが安全な方法です。
+
+\`\`\`
+# ヘッダー値への埋め込み例（環境変数から安全に参照）
+Authorization: Bearer {{ENV.OPENAI_API_KEY}}
+X-Custom-Key: {{ENV.WEATHER_API_KEY}}
+\`\`\`
+
+---
+
+## ボディ（Body）のタイプ
+
+| タイプ | 用途 |
+|--------|------|
+| **JSON** | REST APIへのデータ送信（最も一般的） |
+| **form-data** | フォーム形式。ファイルと他フィールドを同時に送れる |
+| **raw-text** | プレーンテキストやXMLの送信 |
+| **binary** | 前のノードのファイル変数をそのまま送信 |
+| **none** | GET等、ボディ不要のリクエスト |
+
+---
+
+## エラーハンドリングとリトライ
+
+- **リトライ**: 失敗時に最大10回まで自動リトライ。間隔は最大5000ms
+- **エラーハンドリング**: リクエスト失敗時に代替ルートをワークフロー内で定義可能
+- **タイムアウト**: 接続・読み取り・書き込みのタイムアウトを個別に設定可能
+
+---
+
+## SSRFプロテクション
+
+DifyのHTTPリクエストノードは **SSRFプロキシ** を経由して外部リクエストを送信します。
+
+**SSRF（Server-Side Request Forgery）** とは、攻撃者がサーバーを踏み台にして内部ネットワークへ不正アクセスさせる攻撃手法です。
+
+デフォルトでブロックされるアクセス先：
+- \`localhost\` / \`127.0.0.1\` などのループバックアドレス
+- プライベートIPアドレス（\`192.168.x.x\` / \`10.x.x.x\` / \`172.16.x.x\`）
+- クラウドのメタデータエンドポイント（AWS EC2の IMDSv1 等）
+
+> 自己ホスト（Self-hosted）版のDifyでは、ホワイトリストを設定することで特定の内部エンドポイントへのアクセスを許可できます。`,
+          keyPoints: [
+            'APIキーはDifyの環境変数に登録して {{ENV.変数名}} で参照するのがセキュアな方法',
+            'ボディタイプはJSON・フォームデータ・バイナリ・rawテキスト・noneから選ぶ',
+            'SSRFプロキシにより、localhost等の内部ネットワークへのアクセスがデフォルトでブロックされる',
+          ],
+        },
+        {
+          id: 4,
+          type: 'output',
+          title: '確認クイズ：認証設定とAPIキー管理（すべて選択）',
+          question: 'DifyのHTTPリクエストノードの認証・APIキー管理について**正しいものをすべて**選んでください。',
+          format: 'multi-select',
+          options: [
+            { label: 'Bearer Token認証を選ぶと、DifyがリクエストヘッダーにAuthorization: Bearer <値>を自動的に付与する', isCorrect: true },
+            { label: 'Basic Auth認証では、ユーザー名とパスワードがBase64エンコードされてAuthorizationヘッダーに設定される', isCorrect: true },
+            { label: 'APIキーをDifyの環境変数に登録すれば、ヘッダー値に {{ENV.変数名}} として安全に参照できる', isCorrect: true },
+            { label: 'HTTPリクエストノードにAPIキーを直接テキスト入力しても、Difyが自動的に暗号化して保管するため外部から閲覧できない', isCorrect: false },
+            { label: 'API Key認証タイプを使えば、OAuth2.0の認可コードフロー（ブラウザリダイレクト付き認証）を自動的に実行できる', isCorrect: false },
+          ],
+          hint: 'Bearer認証は多くのSaaS APIで使われる標準的なトークン認証です。Basic認証のBase64はエンコードであり「暗号化」ではなく容易にデコード可能なため、HTTPSと組み合わせて使う必要があります。APIキーをノードに直書きするとフロー設定を閲覧できる人に見えてしまいます。OAuth2.0の認可コードフロー（ブラウザリダイレクトを伴う）はDifyのHTTPリクエストノードでは直接サポートされていません。',
+        },
+        {
+          id: 5,
+          type: 'output',
+          title: '確認クイズ：SSRFプロテクションの仕組み',
+          question: 'DifyのHTTPリクエストノードに組み込まれている「SSRFプロテクション」の目的と動作として正しいものはどれですか？',
+          format: 'multiple-choice',
+          options: [
+            { label: 'サーバーを経由して内部ネットワーク（localhost・プライベートIPなど）への不正アクセスを防ぐため、デフォルトでそれらのアドレスへのリクエストをブロックする', isCorrect: true },
+            { label: 'SSRFとは「SQL Structured Response Format」の略で、JSONレスポンスを検証してSQLインジェクションを防ぐ機能', isCorrect: false },
+            { label: 'SSRFプロテクションはHTTPS通信のみに有効で、HTTP（非暗号化）のリクエストには適用されない', isCorrect: false },
+            { label: 'SSRFプロテクションが有効な環境では、HTTPリクエストノードのメソッドがGETのみに制限される', isCorrect: false },
+          ],
+          hint: 'SSRF（Server-Side Request Forgery：サーバーサイドリクエストフォージェリ）は、攻撃者がDifyのサーバーを「踏み台」にして社内ネットワークやクラウドのメタデータエンドポイント（AWS EC2のIMDSv1など）に不正アクセスさせる攻撃手法です。SQLとは無関係です。DifyのSSRFプロキシはプロトコル（HTTP/HTTPS）やHTTPメソッドに関係なく、宛先IPアドレスによるネットワークレベルの制限として機能します。',
+        },
+        {
+          id: 6,
+          type: 'output',
+          title: '課題提出：外部API連携フローを設計・実装しよう',
+          question: 'DifyでHTTPリクエストノードを使って外部APIと連携するフローを設計・実装してみましょう。\n\nAIメンターに以下を教えてください：\n① どの外部API・サービスに接続しましたか？（例：天気API・Slack Webhook・自社API等）\n② HTTPメソッドと認証タイプは何を使いましたか？\n③ レスポンスのbodyをどう後続ノードに渡しましたか？JSON解析の工夫があれば教えてください。',
+          format: 'chat',
+          hint: '無料・APIキー不要で試せる「Open-Meteo（天気予報API）」がおすすめです。GETリクエストで https://api.open-meteo.com/v1/forecast?latitude=35.68&longitude=139.76&current_weather=true にアクセスするだけで東京の気象データが取得できます。',
+          hint2: '例: ①Open-Meteo天気API ②GET・認証なし ③bodyをコード実行ノードでjson.loads()してcurrent_weather.temperatureを取り出し、LLMに「現在の気温は○℃です。今日の服装を提案してください」と渡した',
         },
       ],
     },
