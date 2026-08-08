@@ -169,12 +169,12 @@ export default function CampPage() {
                         <Link href={`/camp/${phase.id}`}>
                           <Button
                             className={
-                              cleared
+                              pct === 100
                                 ? 'bg-slate-700 hover:bg-slate-600'
                                 : 'bg-indigo-600 hover:bg-indigo-500'
                             }
                           >
-                            {cleared ? '復習する' : isCurrent ? '続ける →' : '始める →'}
+                            {pct === 100 ? '復習する' : isCurrent ? '続ける →' : '始める →'}
                           </Button>
                         </Link>
                       ) : (
