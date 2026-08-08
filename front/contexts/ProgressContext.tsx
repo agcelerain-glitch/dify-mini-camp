@@ -66,16 +66,16 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
 
   function isLevelUnlocked(phaseId: number, levelId: number): boolean {
     if (!LOCK_ENABLED) return true;
-    if (levelId === 1) return true;
+    // クリア済みのレベルは常にアンロック（コンテンツ追加後も影響なし）
+    if (isLevelCleared(phaseId, levelId)) return true;
 
-    const phaseLevels = progress.phases[phaseId]?.levels ?? {};
-    // コンテンツが途中挿入された場合でも対応できるよう、
-    // そのフェーズでクリアした最高レベルIDを基準にする
-    const maxClearedLevelId = Object.entries(phaseLevels)
-      .filter(([, lv]) => !!lv.clearedAt)
-      .reduce((max, [id]) => Math.max(max, Number(id)), 0);
-
-    return maxClearedLevelId >= levelId - 1;
+    const phase = PHASES.find((p) => p.id === phaseId);
+    if (!phase) return false;
+    // 配列インデックスで前レベルを特定（ID非連続・途中挿入でも正確）
+    const levelIndex = phase.levels.findIndex((l) => l.id === levelId);
+    if (levelIndex <= 0) return true;
+    const prevLevel = phase.levels[levelIndex - 1];
+    return isLevelCleared(phaseId, prevLevel.id);
   }
 
   function isPhaseCleared(phaseId: number): boolean {
@@ -92,9 +92,12 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
 
   function isPageUnlocked(phaseId: number, levelId: number, pageId: number): boolean {
     if (!LOCK_ENABLED) return true;
+    // クリア済みのページは常にアンロック（コンテンツ追加後も影響なし）
+    if (isPageCleared(phaseId, levelId, pageId)) return true;
     const phase = PHASES.find((p) => p.id === phaseId);
     const level = phase?.levels.find((l) => l.id === levelId);
     if (!level) return false;
+    // 配列インデックスで前ページを特定（ID非連続・途中挿入でも正確）
     const pageIndex = level.pages.findIndex((p) => p.id === pageId);
     if (pageIndex <= 0) return true;
     const prevPage = level.pages[pageIndex - 1];
@@ -119,8 +122,10 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     const phase = PHASES.find((p) => p.id === phaseId);
     const level = phase?.levels.find((l) => l.id === levelId);
     if (!level) return 0;
-    const clearedPages = progress.phases[phaseId]?.levels[levelId]?.clearedPages.length ?? 0;
-    return Math.round((clearedPages / level.pages.length) * 100);
+    // ページIDが実際にDBのclearedPagesに含まれているかを照合（ID非連続でも正確）
+    const storedCleared = progress.phases[phaseId]?.levels[levelId]?.clearedPages ?? [];
+    const cleared = level.pages.filter((page) => storedCleared.includes(page.id)).length;
+    return Math.round((cleared / level.pages.length) * 100);
   }
 
   function completePage(phaseId: number, levelId: number, pageId: number) {

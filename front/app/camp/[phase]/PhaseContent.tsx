@@ -354,7 +354,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                                 {!pUnlocked ? '🔒' : pCleared ? '✅' : page.type === 'input' ? '📖' : '✏️'}
                               </span>
                               <span className="line-clamp-1">
-                                P{page.id}. {page.title}
+                                P{idx + 1}. {page.title}
                               </span>
                             </button>
                           );
@@ -403,7 +403,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
               <span>/</span>
               <span className={phase.textColor}>Level {currentLevelId}</span>
               <span>/</span>
-              <span>ページ {currentPage.id}</span>
+              <span>ページ {currentPageIndex + 1}</span>
             </div>
 
             {/* レベルヘッダー */}
@@ -441,7 +441,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                       }`}
                     >
                       {!pUnlocked ? '🔒 ' : pCleared && !pActive ? '✅ ' : page.type === 'input' ? '📖 ' : '✏️ '}
-                      ページ{page.id}
+                      ページ{idx + 1}
                     </button>
                   );
                 })}
@@ -459,7 +459,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                   <Badge className={`text-xs ${phase.badgeBg}`}>
                     {currentPage.type === 'input' ? '📖 インプット' : '✏️ アウトプット'}
                   </Badge>
-                  <span className="text-xs text-slate-500">ページ {currentPage.id} / {totalPages}</span>
+                  <span className="text-xs text-slate-500">ページ {currentPageIndex + 1} / {totalPages}</span>
                 </div>
                 <h3 className="mt-2 text-xl font-bold text-white">{currentPage.title}</h3>
               </div>

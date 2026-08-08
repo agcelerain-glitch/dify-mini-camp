@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
-  const { progress, isPhaseCleared, isPhaseUnlocked, getPhaseProgress, resetAll } = useProgress();
+  const { progress, isPhaseCleared, isPhaseUnlocked, isPageCleared, getPhaseProgress, resetAll } = useProgress();
   const router = useRouter();
 
   useEffect(() => {
@@ -29,9 +29,19 @@ export default function HomePage() {
     );
   }
 
-  const clearedPhases = PHASES.filter((p) => isPhaseCleared(p.id)).length;
-  const totalProgress = Math.round((clearedPhases / PHASES.length) * 100);
-  const isMaster = totalProgress === 100;
+  // 全体進捗：フェーズクリア数ではなく全ページ単位で集計
+  let totalPages = 0;
+  let totalCleared = 0;
+  for (const phase of PHASES) {
+    for (const level of phase.levels) {
+      for (const page of level.pages) {
+        totalPages++;
+        if (isPageCleared(phase.id, level.id, page.id)) totalCleared++;
+      }
+    }
+  }
+  const totalProgress = totalPages === 0 ? 0 : Math.round((totalCleared / totalPages) * 100);
+  const isMaster = PHASES.every((p) => isPhaseCleared(p.id));
   const currentPhase = progress.currentPhase;
   const currentPhaseData = PHASES.find((p) => p.id === currentPhase);
   const currentLevel = progress.phases[currentPhase]?.currentLevel ?? 1;
@@ -65,7 +75,7 @@ export default function HomePage() {
             <div className="text-right">
               <p className="text-xs text-slate-500">全体進捗</p>
               <p className="text-3xl font-bold text-white">{totalProgress}%</p>
-              <p className="text-xs text-slate-500">{clearedPhases} / {PHASES.length} フェーズ完了</p>
+              <p className="text-xs text-slate-500">{totalCleared} / {totalPages} ページ完了</p>
             </div>
           </div>
           <div className="mt-4">

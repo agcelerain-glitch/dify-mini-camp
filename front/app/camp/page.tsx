@@ -112,9 +112,12 @@ export default function CampPage() {
                               const lCleared = isLevelCleared(phase.id, level.id);
                               const lUnlocked = isLevelUnlocked(phase.id, level.id);
                               const lCurrent = level.id === currentLevel && isCurrent;
-                              const clearedPages =
-                                progress.phases[phase.id]?.levels[level.id]?.clearedPages.length ?? 0;
-                              const levelPct = Math.round((clearedPages / level.pages.length) * 100);
+                              const levelClearedPages =
+                                progress.phases[phase.id]?.levels[level.id]?.clearedPages ?? [];
+                              const clearedPageCount = level.pages.filter((p) =>
+                                levelClearedPages.includes(p.id),
+                              ).length;
+                              const levelPct = Math.round((clearedPageCount / level.pages.length) * 100);
 
                               return lUnlocked ? (
                                 <Link
