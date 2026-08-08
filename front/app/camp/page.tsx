@@ -112,7 +112,7 @@ export default function CampPage() {
                               return lUnlocked ? (
                                 <Link
                                   key={level.id}
-                                  href={`/camp/${phase.id}`}
+                                  href={`/camp/${phase.id}?level=${level.id}`}
                                   className={`rounded-xl border p-3 transition-colors hover:bg-slate-800 ${
                                     lCleared
                                       ? 'border-emerald-500/30 bg-emerald-500/5'

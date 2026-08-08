@@ -14,14 +14,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
-type Props = { phase: Phase };
+type Props = { phase: Phase; initialLevel?: number };
 
-export function PhaseContent({ phase }: Props) {
+export function PhaseContent({ phase, initialLevel = 1 }: Props) {
   const { user, isLoading } = useAuth();
   const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, isPageUnlocked, getPhaseProgress, getLevelProgress, completePage, completeLevel } = useProgress();
   const router = useRouter();
 
-  const [currentLevelId, setCurrentLevelId] = useState(1);
+  const [currentLevelId, setCurrentLevelId] = useState(initialLevel);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
 

@@ -5,6 +5,7 @@ import { PhaseContent } from './PhaseContent';
 
 export default function PhasePage(props: PageProps<'/camp/[phase]'>) {
   const { phase: phaseParam } = use(props.params);
+  const searchParams = use(props.searchParams);
   const phaseId = parseInt(phaseParam, 10);
 
   if (isNaN(phaseId) || phaseId < 1 || phaseId > 5) {
@@ -14,5 +15,9 @@ export default function PhasePage(props: PageProps<'/camp/[phase]'>) {
   const phase = getPhase(phaseId);
   if (!phase) notFound();
 
-  return <PhaseContent phase={phase} />;
+  const levelParam = searchParams?.level;
+  const parsedLevel = parseInt(typeof levelParam === 'string' ? levelParam : '1', 10);
+  const initialLevel = phase.levels.find((l) => l.id === parsedLevel) ? parsedLevel : 1;
+
+  return <PhaseContent phase={phase} initialLevel={initialLevel} />;
 }
