@@ -42,6 +42,8 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
   const [isTyping, setIsTyping] = useState(false);
   const [isCleared, setIsCleared] = useState(false);
   const [gradingPending, setGradingPending] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace('/');
@@ -91,6 +93,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
     setShowHint(false);
     setIsCleared(false);
     setGradingPending(false);
+    setSaveError(false);
   }
 
   function goToLevel(levelId: number) {
@@ -109,17 +112,26 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
     scrollTop();
   }
 
-  function handleNext() {
-    completePage(phase.id, currentLevelId, currentPage.id);
-    if (currentPageIndex < totalPages - 1) {
-      // goToPage は isPageUnlocked を参照するが、completePage 直後は
-      // setProgress の再レンダリングが完了していないため古いstateを見てしまう。
-      // ここでは明示的に「次へ進む」操作なのでロックチェックを省いて直接遷移する。
-      setCurrentPageIndex(currentPageIndex + 1);
-      resetPageState();
-      scrollTop();
-    } else {
-      completeLevel(phase.id, currentLevelId);
+  async function handleNext() {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(false);
+    try {
+      await completePage(phase.id, currentLevelId, currentPage.id);
+      if (currentPageIndex < totalPages - 1) {
+        // goToPage は isPageUnlocked を参照するが、completePage 直後は
+        // setProgress の再レンダリングが完了していないため古いstateを見てしまう。
+        // ここでは明示的に「次へ進む」操作なのでロックチェックを省いて直接遷移する。
+        setCurrentPageIndex(currentPageIndex + 1);
+        resetPageState();
+        scrollTop();
+      } else {
+        await completeLevel(phase.id, currentLevelId);
+      }
+    } catch {
+      setSaveError(true);
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -511,25 +523,28 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                   </Button>
 
                   <div className="flex items-center gap-3">
-                    {isPageCleared(phase.id, currentLevelId, currentPage.id) && (
+                    {saveError && (
+                      <span className="text-xs text-rose-400">保存に失敗しました。もう一度お試しください。</span>
+                    )}
+                    {isPageCleared(phase.id, currentLevelId, currentPage.id) && !saveError && (
                       <span className="text-xs text-emerald-400">✅ クリア済み</span>
                     )}
 
                     {currentPageIndex < totalPages - 1 ? (
                       <Button
                         onClick={handleNext}
-                        disabled={!canProceed}
+                        disabled={!canProceed || isSaving}
                         className="bg-indigo-600 hover:bg-indigo-500"
                       >
-                        次のページへ →
+                        {isSaving ? '保存中...' : '次のページへ →'}
                       </Button>
                     ) : !isLevelCleared(phase.id, currentLevelId) ? (
                       <Button
                         onClick={handleNext}
-                        disabled={!canProceed}
+                        disabled={!canProceed || isSaving}
                         className="bg-indigo-600 hover:bg-indigo-500"
                       >
-                        レベルをクリア 🎉
+                        {isSaving ? '保存中...' : 'レベルをクリア 🎉'}
                       </Button>
                     ) : nextLevel ? (
                       <Button

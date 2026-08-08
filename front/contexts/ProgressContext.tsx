@@ -23,8 +23,8 @@ type ProgressContextType = {
   isPageUnlocked: (phaseId: number, levelId: number, pageId: number) => boolean;
   getPhaseProgress: (phaseId: number) => number;
   getLevelProgress: (phaseId: number, levelId: number) => number;
-  completePage: (phaseId: number, levelId: number, pageId: number) => void;
-  completeLevel: (phaseId: number, levelId: number) => void;
+  completePage: (phaseId: number, levelId: number, pageId: number) => Promise<void>;
+  completeLevel: (phaseId: number, levelId: number) => Promise<void>;
   completePhase: (phaseId: number) => void;
   resetAll: () => void;
   refreshProgress: () => void;
@@ -131,7 +131,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     return Math.round((cleared / level.pages.length) * 100);
   }
 
-  function completePage(phaseId: number, levelId: number, pageId: number) {
+  async function completePage(phaseId: number, levelId: number, pageId: number): Promise<void> {
     const next = structuredClone(progress);
     if (!next.phases[phaseId]) {
       next.phases[phaseId] = { currentLevel: levelId, levels: {} };
@@ -145,14 +145,14 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     setProgress(next);
 
     if (user) {
-      upsertProgress(user.id, phaseId, levelId, {
+      await upsertProgress(user.id, phaseId, levelId, {
         clearedPages: lv.clearedPages,
         currentPage: lv.currentPage,
-      }).catch(console.error);
+      });
     }
   }
 
-  function completeLevel(phaseId: number, levelId: number) {
+  async function completeLevel(phaseId: number, levelId: number): Promise<void> {
     const phase = PHASES.find((p) => p.id === phaseId);
     const level = phase?.levels.find((l) => l.id === levelId);
     const now = new Date().toISOString();
@@ -185,15 +185,15 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     setProgress(next);
 
     if (user) {
-      upsertProgress(user.id, phaseId, levelId, {
+      await upsertProgress(user.id, phaseId, levelId, {
         clearedPages: lv.clearedPages,
         currentPage: (level?.pages.length ?? 0) + 1,
         levelClearedAt: now,
         phaseClearedAt,
-      }).catch(console.error);
+      });
 
       if (allLevelsCleared) {
-        upsertUserState(user.id, next.currentPhase, 1).catch(console.error);
+        await upsertUserState(user.id, next.currentPhase, 1);
       }
     }
   }
