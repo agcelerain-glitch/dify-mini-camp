@@ -1974,6 +1974,12 @@ Difyの左サイドバーには上から順に「**ホーム**」「**スタジ�
 > 試しに「Dify基本用語集.txt」のような短いテキストを作ってアップロードしてみましょう。
 > 実務なら社内マニュアルや商品カタログなど、AIに読み込ませたい文書を使います。
 
+> 📋 **無料枠の目安（Dify Cloud Sandboxプラン）**
+> - ドキュメント数: 最大 **50ファイル**
+> - ストレージ: 最大 **50MB**（全ナレッジベース合計）
+>
+> 学習・試験的な用途には十分な容量です。大量の社内マニュアルをまるごと入れたい場合は有料プランの検討が必要になります。
+
 ---
 
 ### Step 3: フローに「知識検索」ブロックを追加
@@ -2169,30 +2175,30 @@ const response = await fetch(url, { headers: { Authorization: apiKey } });
 
 ---
 
-## Next.js + Vercelでの環境変数
+## フレームワーク・ホスティングでの環境変数
 
 ### ローカル開発時: .env.local ファイル
 \`\`\`
-# front/.env.local（GitHubにアップしない！）
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxxxxx
+# .env.local（GitHubにアップしない！）
 
-# NEXT_PUBLIC_なしはサーバーサイドのみ（重要！）
+# DifyのAPIキー（サーバーサイドのみ）
 DIFY_API_KEY=app-xxxxxxxxxxxxxxxxxx
 DIFY_API_URL=https://api.dify.ai/v1
 \`\`\`
 
-### 本番環境: Vercelの環境変数設定
-Vercelダッシュボード → Settings → Environment Variables
+### 本番環境: ホスティングサービスの環境変数設定
+（例: Vercelの場合）ダッシュボード → Settings → Environment Variables
 
 ---
 
-## NEXT_PUBLIC_ の意味
+## NEXT_PUBLIC_ プレフィックスの意味（Next.js固有）
 
-| 変数名 | アクセス可能な場所 |
-|-------|-----------------|
-| \`NEXT_PUBLIC_SUPABASE_URL\` | サーバー + **クライアント（ブラウザ）** |
-| \`DIFY_API_KEY\`（NEXT_PUBLIC_なし） | **サーバーサイドのみ** |
+Next.jsでは変数名の先頭に `NEXT_PUBLIC_` をつけるかどうかで、アクセス範囲が変わります。
+
+| 変数名の形式 | アクセス可能な場所 | 用途の例 |
+|-------------|-----------------|--------|
+| \`NEXT_PUBLIC_変数名\` | サーバー + **クライアント（ブラウザ）** | 公開しても問題ない設定値 |
+| \`変数名\`（プレフィックスなし） | **サーバーサイドのみ** | APIキー・シークレット |
 
 **DifyのAPIキーには必ず NEXT_PUBLIC_ をつけない！**
 → ブラウザから見えてしまい、悪用されるリスクがあります。`,
@@ -2296,7 +2302,7 @@ Difyワークフロー内でも環境変数を使えます:
           id: 5,
           type: 'output',
           title: '確認クイズ：NEXT_PUBLIC_プレフィックスの意味',
-          question: 'Next.jsで「NEXT_PUBLIC_SUPABASE_URL」と「DIFY_API_KEY」（プレフィックスなし）の違いとして正しいものはどれですか？',
+          question: 'Next.jsで「NEXT_PUBLIC_変数名」と「変数名のみ（プレフィックスなし）」の違いとして正しいものはどれですか？',
           format: 'multiple-choice',
           options: [
             { label: 'NEXT_PUBLIC_はブラウザからも参照可能、プレフィックスなしはサーバーサイドのみ', isCorrect: true },
