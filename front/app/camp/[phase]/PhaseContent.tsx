@@ -45,6 +45,11 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
   const [gradingPending, setGradingPending] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  // 修了フィードバック用（最終ページ専用）
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace('/');
@@ -61,6 +66,9 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
   const currentLevel = phase.levels.find((l) => l.id === currentLevelId) ?? phase.levels[0];
   const currentPage = currentLevel.pages[currentPageIndex];
   const totalPages = currentLevel.pages.length;
+  // Phase 5 / Level id=2 / Page id=6 が修了フィードバックページ
+  const isFinalGraduationPage =
+    phase.id === 5 && currentLevelId === 2 && currentPage.id === 6;
 
   // 次レベルをIDではなく配列インデックスで特定（レベルID非連続・途中挿入でも正確）
   const currentLevelIndex = phase.levels.findIndex((l) => l.id === currentLevelId);
@@ -96,6 +104,10 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
     setIsCleared(false);
     setGradingPending(false);
     setSaveError(false);
+    setFeedbackRating(null);
+    setFeedbackComment('');
+    setFeedbackSubmitted(false);
+    setFeedbackSubmitting(false);
   }
 
   function goToLevel(levelId: number) {
@@ -174,6 +186,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
           message: text,
           phase: phase.id,
           levelId: currentLevelId,
+          pageId: currentPage.id,
           interactionType: 'question',
         }),
       });
@@ -264,13 +277,40 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
     }
   }
 
+  async function handleFeedbackSubmit() {
+    if (feedbackRating === null || feedbackSubmitting) return;
+    setFeedbackSubmitting(true);
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: feedbackRating,
+          comment: feedbackComment.trim() || null,
+          phaseId: phase.id,
+          levelId: currentLevelId,
+          pageId: currentPage.id,
+        }),
+      });
+    } catch {
+      // フィードバック保存失敗でも修了処理は続行
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+    setFeedbackSubmitted(true);
+    await handleNext();
+  }
+
   const canProceed: boolean = (() => {
     if (currentPage.type === 'input') return true;
     const out = currentPage as OutputPage;
     if (out.format === 'multiple-choice') return answered;
     if (out.format === 'multi-select') return answered;
     if (out.format === 'short-answer') return answered;
-    if (out.format === 'chat') return isCleared; // AI採点でis_cleared: trueになるまで進めない
+    if (out.format === 'chat') {
+      if (isFinalGraduationPage) return feedbackSubmitted;
+      return isCleared; // AI採点でis_cleared: trueになるまで進めない
+    }
     return false;
   })();
 
@@ -508,6 +548,14 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                     onSubmitAnswer={handleSubmitAnswer}
                     onToggleHint={() => setShowHint((v) => !v)}
                     onToggleHint2={() => setShowHint2((v) => !v)}
+                    isFinalGraduationPage={isFinalGraduationPage}
+                    feedbackRating={feedbackRating}
+                    feedbackComment={feedbackComment}
+                    feedbackSubmitted={feedbackSubmitted}
+                    feedbackSubmitting={feedbackSubmitting}
+                    onFeedbackRatingChange={setFeedbackRating}
+                    onFeedbackCommentChange={setFeedbackComment}
+                    onFeedbackSubmit={handleFeedbackSubmit}
                   />
                 )}
 
@@ -744,6 +792,15 @@ type OutputProps = {
   onSubmitAnswer: () => void;
   onToggleHint: () => void;
   onToggleHint2: () => void;
+  // 最終ページ専用
+  isFinalGraduationPage: boolean;
+  feedbackRating: number | null;
+  feedbackComment: string;
+  feedbackSubmitted: boolean;
+  feedbackSubmitting: boolean;
+  onFeedbackRatingChange: (n: number) => void;
+  onFeedbackCommentChange: (s: string) => void;
+  onFeedbackSubmit: () => void;
 };
 
 function OutputPageContent({
@@ -770,6 +827,14 @@ function OutputPageContent({
   onSubmitAnswer,
   onToggleHint,
   onToggleHint2,
+  isFinalGraduationPage,
+  feedbackRating,
+  feedbackComment,
+  feedbackSubmitted,
+  feedbackSubmitting,
+  onFeedbackRatingChange,
+  onFeedbackCommentChange,
+  onFeedbackSubmit,
 }: OutputProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [chatFocused, setChatFocused] = useState(false);
@@ -1019,8 +1084,8 @@ function OutputPageContent({
             </div>
           )}
 
-          {/* 採点ボタン: 会話が始まっていて、まだ合格していない場合に表示 */}
-          {chatMessages.length > 0 && !isCleared && (
+          {/* 採点ボタン: 最終ページ以外・会話が始まっていて・まだ合格していない場合に表示 */}
+          {!isFinalGraduationPage && chatMessages.length > 0 && !isCleared && (
             <div className="mt-3 border-t border-white/10 pt-3">
               <p className="mb-2 text-xs text-slate-400">
                 課題を完了したら採点を依頼してください（最後に送ったメッセージが採点対象になります）
@@ -1038,10 +1103,71 @@ function OutputPageContent({
             </div>
           )}
 
-          {/* 合格後メッセージ */}
-          {isCleared && (
+          {/* 合格後メッセージ（最終ページ以外） */}
+          {!isFinalGraduationPage && isCleared && (
             <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
               ✅ 合格！下の「レベルをクリア」ボタンで次へ進みましょう。
+            </div>
+          )}
+
+          {/* 修了フィードバックウィジェット（最終ページ専用） */}
+          {isFinalGraduationPage && !feedbackSubmitted && (
+            <div className="mt-5 rounded-xl border border-violet-500/30 bg-violet-500/10 p-4">
+              <p className="mb-1 text-sm font-semibold text-violet-300">
+                コース修了アンケート（必須）
+              </p>
+              <p className="mb-4 text-xs text-slate-400">
+                以下のアンケートを送信するとコースが修了します。AIメンターとの会話もお楽しみください。
+              </p>
+
+              {/* 星評価 */}
+              <p className="mb-2 text-xs text-slate-300">満足度を選んでください</p>
+              <div className="mb-4 flex gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => onFeedbackRatingChange(star)}
+                    className={`text-2xl transition-transform hover:scale-110 ${
+                      feedbackRating !== null && star <= feedbackRating
+                        ? 'text-yellow-400'
+                        : 'text-slate-600'
+                    }`}
+                    aria-label={`${star}点`}
+                  >
+                    ★
+                  </button>
+                ))}
+                {feedbackRating && (
+                  <span className="ml-2 self-center text-xs text-slate-400">
+                    {['', '不満', 'やや不満', '普通', 'やや満足', '大満足'][feedbackRating]}
+                  </span>
+                )}
+              </div>
+
+              {/* コメント欄 */}
+              <p className="mb-1 text-xs text-slate-300">ご意見・感想（任意）</p>
+              <textarea
+                value={feedbackComment}
+                onChange={(e) => onFeedbackCommentChange(e.target.value)}
+                placeholder="改善点や感想があればお聞かせください..."
+                rows={3}
+                className="mb-3 w-full resize-y rounded-xl border border-white/10 bg-slate-800 p-3 text-sm text-white placeholder-slate-600 outline-none focus:border-violet-500"
+              />
+
+              <Button
+                onClick={onFeedbackSubmit}
+                disabled={feedbackRating === null || feedbackSubmitting}
+                className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50"
+              >
+                {feedbackSubmitting ? '送信中...' : 'フィードバックを送信してコースを修了する 🎊'}
+              </Button>
+            </div>
+          )}
+
+          {/* 修了後メッセージ */}
+          {isFinalGraduationPage && feedbackSubmitted && (
+            <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-center text-sm text-yellow-200">
+              🎊 フィードバックを送信しました！お疲れ様でした！
             </div>
           )}
         </div>

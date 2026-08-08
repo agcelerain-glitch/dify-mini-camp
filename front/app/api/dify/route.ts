@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     message,
     phase = 1,
     levelId = 1,
+    pageId,
     interactionType = 'question',
     conversationId,
   } = body;
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
         sys_query: message,
         current_phase: String(phase),
         current_level: String(levelId),
+        current_page: pageId != null ? String(pageId) : '',
         interaction_type: interactionType,
       },
       response_mode: 'blocking',
