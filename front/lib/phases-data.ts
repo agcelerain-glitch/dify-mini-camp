@@ -2495,15 +2495,16 @@ def main(price: float, quantity: int) -> dict:
           id: 4,
           type: 'output',
           title: '確認クイズ：入出力変数の仕組み',
-          question: 'コード実行ノードの入出力変数に関して正しいものを2つ選んでください。',
+          question: 'コード実行ノードの入出力変数に関して**正しいものをすべて**選んでください。',
           format: 'multi-select',
           options: [
             { label: 'コードの関数が返す辞書（dict）のキー名と、定義した出力変数名を一致させる必要がある', isCorrect: true },
             { label: 'やりたいことを日本語で説明するとAIが自動でコードを生成してくれる機能がある', isCorrect: true },
             { label: '出力変数の数は最大1つのみで、複数の値を返すことはできない', isCorrect: false },
             { label: 'コード実行ノードはWorkflowでのみ使えてChatflowでは使えない', isCorrect: false },
+            { label: '入力変数として渡せるデータ型は文字列と数値の2種類のみで、リストやオブジェクトは設定できない', isCorrect: false },
           ],
-          hint: 'コード実行ノードはAI生成機能つきで、複数の値を辞書で返せます。WorkflowとChatflow両方で使えます。',
+          hint: 'コード実行ノードはAI生成機能つきで、複数の値を辞書で返せます。WorkflowとChatflow両方で使えます。また入力変数の型は文字列・数値のほかリストやオブジェクトも設定可能です。',
         },
         {
           id: 5,
