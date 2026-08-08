@@ -59,6 +59,13 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
   const currentPage = currentLevel.pages[currentPageIndex];
   const totalPages = currentLevel.pages.length;
 
+  // 次レベルをIDではなく配列インデックスで特定（レベルID非連続・途中挿入でも正確）
+  const currentLevelIndex = phase.levels.findIndex((l) => l.id === currentLevelId);
+  const nextLevel =
+    currentLevelIndex >= 0 && currentLevelIndex < phase.levels.length - 1
+      ? phase.levels[currentLevelIndex + 1]
+      : null;
+
   // ページ切替・レベル切替・リロードのたびに選択肢をシャッフルしてマンネリ防止
   const shuffledOptions = useMemo(() => {
     if (currentPage.type !== 'output') return [];
@@ -524,9 +531,9 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                       >
                         レベルをクリア 🎉
                       </Button>
-                    ) : currentLevelId < phase.levels.length ? (
+                    ) : nextLevel ? (
                       <Button
-                        onClick={() => goToLevel(currentLevelId + 1)}
+                        onClick={() => goToLevel(nextLevel.id)}
                         className="bg-emerald-600 hover:bg-emerald-500"
                       >
                         次のレベルへ →

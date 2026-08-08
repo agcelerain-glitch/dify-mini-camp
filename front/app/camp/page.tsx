@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 
 export default function CampPage() {
   const { user, isLoading } = useAuth();
-  const { isPhaseCleared, isLevelCleared, isPhaseUnlocked, isLevelUnlocked, progress } = useProgress();
+  const { isPhaseCleared, isLevelCleared, isPhaseUnlocked, isLevelUnlocked, isPageCleared, progress } = useProgress();
   const router = useRouter();
 
   useEffect(() => {
@@ -32,8 +32,15 @@ export default function CampPage() {
   function getPhaseProgress(phaseId: number): number {
     const phase = PHASES.find((p) => p.id === phaseId);
     if (!phase) return 0;
-    const cleared = phase.levels.filter((l) => isLevelCleared(phaseId, l.id)).length;
-    return Math.round((cleared / phase.levels.length) * 100);
+    let total = 0;
+    let cleared = 0;
+    for (const level of phase.levels) {
+      for (const page of level.pages) {
+        total++;
+        if (isPageCleared(phaseId, level.id, page.id)) cleared++;
+      }
+    }
+    return total === 0 ? 0 : Math.round((cleared / total) * 100);
   }
 
   return (

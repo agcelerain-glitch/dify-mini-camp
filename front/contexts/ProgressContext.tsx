@@ -92,15 +92,27 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
 
   function isPageUnlocked(phaseId: number, levelId: number, pageId: number): boolean {
     if (!LOCK_ENABLED) return true;
-    if (pageId === 1) return true;
-    return isPageCleared(phaseId, levelId, pageId - 1);
+    const phase = PHASES.find((p) => p.id === phaseId);
+    const level = phase?.levels.find((l) => l.id === levelId);
+    if (!level) return false;
+    const pageIndex = level.pages.findIndex((p) => p.id === pageId);
+    if (pageIndex <= 0) return true;
+    const prevPage = level.pages[pageIndex - 1];
+    return isPageCleared(phaseId, levelId, prevPage.id);
   }
 
   function getPhaseProgress(phaseId: number): number {
     const phase = PHASES.find((p) => p.id === phaseId);
     if (!phase) return 0;
-    const clearedLevels = phase.levels.filter((l) => isLevelCleared(phaseId, l.id)).length;
-    return Math.round((clearedLevels / phase.levels.length) * 100);
+    let total = 0;
+    let cleared = 0;
+    for (const level of phase.levels) {
+      for (const page of level.pages) {
+        total++;
+        if (isPageCleared(phaseId, level.id, page.id)) cleared++;
+      }
+    }
+    return total === 0 ? 0 : Math.round((cleared / total) * 100);
   }
 
   function getLevelProgress(phaseId: number, levelId: number): number {
@@ -135,7 +147,6 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   function completeLevel(phaseId: number, levelId: number) {
     const phase = PHASES.find((p) => p.id === phaseId);
     const level = phase?.levels.find((l) => l.id === levelId);
-    const totalPages = level?.pages.length ?? 0;
     const now = new Date().toISOString();
 
     const next = structuredClone(progress);
@@ -146,9 +157,9 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       next.phases[phaseId].levels[levelId] = { currentPage: 1, clearedPages: [] };
     }
     const lv = next.phases[phaseId].levels[levelId];
-    for (let i = 1; i <= totalPages; i++) {
-      if (!lv.clearedPages.includes(i)) lv.clearedPages.push(i);
-    }
+    level?.pages.forEach((page) => {
+      if (!lv.clearedPages.includes(page.id)) lv.clearedPages.push(page.id);
+    });
     lv.clearedAt = now;
 
     const allLevelsCleared = phase?.levels.every(
@@ -168,7 +179,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     if (user) {
       upsertProgress(user.id, phaseId, levelId, {
         clearedPages: lv.clearedPages,
-        currentPage: totalPages + 1,
+        currentPage: (level?.pages.length ?? 0) + 1,
         levelClearedAt: now,
         phaseClearedAt,
       }).catch(console.error);
