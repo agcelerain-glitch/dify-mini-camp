@@ -33,6 +33,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
 
   // クイズ/アウトプット用状態
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
   const [answered, setAnswered] = useState(false);
   const [shortAnswer, setShortAnswer] = useState('');
   const [chatInput, setChatInput] = useState('');
@@ -75,6 +76,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
 
   function resetPageState() {
     setSelectedOption(null);
+    setSelectedOptions([]);
     setAnswered(false);
     setShortAnswer('');
     setChatInput('');
@@ -117,6 +119,18 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
   function handleMultipleChoice(idx: number) {
     if (answered) return;
     setSelectedOption(idx);
+    setAnswered(true);
+  }
+
+  function handleMultiSelectToggle(idx: number) {
+    if (answered) return;
+    setSelectedOptions((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx],
+    );
+  }
+
+  function handleMultiSelectSubmit() {
+    if (answered || selectedOptions.length === 0) return;
     setAnswered(true);
   }
 
@@ -233,6 +247,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
     if (currentPage.type === 'input') return true;
     const out = currentPage as OutputPage;
     if (out.format === 'multiple-choice') return answered;
+    if (out.format === 'multi-select') return answered;
     if (out.format === 'short-answer') return answered;
     if (out.format === 'chat') return isCleared; // AI採点でis_cleared: trueになるまで進めない
     return false;
@@ -452,6 +467,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                     phaseColor={phase.textColor}
                     phaseBorderColor={phase.borderColor}
                     selectedOption={selectedOption}
+                    selectedOptions={selectedOptions}
                     answered={answered}
                     shortAnswer={shortAnswer}
                     chatInput={chatInput}
@@ -461,6 +477,8 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                     isCleared={isCleared}
                     gradingPending={gradingPending}
                     onSelectOption={handleMultipleChoice}
+                    onToggleMultiSelect={handleMultiSelectToggle}
+                    onSubmitMultiSelect={handleMultiSelectSubmit}
                     onShortAnswerChange={setShortAnswer}
                     onShortAnswerSubmit={handleShortAnswerSubmit}
                     onChatInputChange={setChatInput}
@@ -680,6 +698,7 @@ type OutputProps = {
   phaseColor: string;
   phaseBorderColor: string;
   selectedOption: number | null;
+  selectedOptions: number[];
   answered: boolean;
   shortAnswer: string;
   chatInput: string;
@@ -689,6 +708,8 @@ type OutputProps = {
   isCleared: boolean;
   gradingPending: boolean;
   onSelectOption: (idx: number) => void;
+  onToggleMultiSelect: (idx: number) => void;
+  onSubmitMultiSelect: () => void;
   onShortAnswerChange: (val: string) => void;
   onShortAnswerSubmit: () => void;
   onChatInputChange: (val: string) => void;
@@ -701,6 +722,7 @@ function OutputPageContent({
   page,
   shuffledOptions,
   selectedOption,
+  selectedOptions,
   answered,
   shortAnswer,
   chatInput,
@@ -710,6 +732,8 @@ function OutputPageContent({
   isCleared,
   gradingPending,
   onSelectOption,
+  onToggleMultiSelect,
+  onSubmitMultiSelect,
   onShortAnswerChange,
   onShortAnswerSubmit,
   onChatInputChange,
@@ -765,6 +789,83 @@ function OutputPageContent({
                 : `❌ 不正解。正解は「${shuffledOptions.find((o) => o.isCorrect)?.label}」です。もう一度復習してから次へ進みましょう。`}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 複数選択 */}
+      {page.format === 'multi-select' && shuffledOptions.length > 0 && (
+        <div className="space-y-2.5">
+          <p className="text-xs text-slate-400">
+            正しいものを {shuffledOptions.filter((o) => o.isCorrect).length} つ選んでください
+          </p>
+          {shuffledOptions.map((opt, idx) => {
+            const isSelected = selectedOptions.includes(idx);
+            let cls = 'w-full rounded-xl border p-4 text-left text-sm transition-all flex items-start gap-3 ';
+            if (!answered) {
+              cls += isSelected
+                ? 'border-indigo-500 bg-indigo-500/20 text-white cursor-pointer'
+                : 'border-white/10 bg-slate-800 text-slate-300 hover:border-white/30 hover:bg-slate-700 cursor-pointer';
+            } else if (isSelected && opt.isCorrect) {
+              cls += 'border-emerald-500 bg-emerald-500/20 text-emerald-300 cursor-default';
+            } else if (isSelected && !opt.isCorrect) {
+              cls += 'border-rose-500 bg-rose-500/20 text-rose-300 cursor-default';
+            } else if (!isSelected && opt.isCorrect) {
+              cls += 'border-emerald-500/40 bg-emerald-500/5 text-emerald-400/70 cursor-default';
+            } else {
+              cls += 'border-white/5 bg-slate-800/30 text-slate-600 cursor-default';
+            }
+            return (
+              <button
+                key={idx}
+                className={cls}
+                onClick={() => !answered && onToggleMultiSelect(idx)}
+                disabled={answered}
+              >
+                <span
+                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 text-[10px] font-bold text-white ${
+                    isSelected && !answered
+                      ? 'border-indigo-400 bg-indigo-500'
+                      : isSelected && answered && opt.isCorrect
+                      ? 'border-emerald-400 bg-emerald-500'
+                      : isSelected && answered && !opt.isCorrect
+                      ? 'border-rose-400 bg-rose-500'
+                      : 'border-slate-500 bg-transparent'
+                  }`}
+                >
+                  {isSelected ? '✓' : ''}
+                </span>
+                {opt.label}
+              </button>
+            );
+          })}
+          {!answered && (
+            <Button
+              onClick={onSubmitMultiSelect}
+              disabled={selectedOptions.length === 0}
+              className="mt-2 w-full bg-indigo-600 hover:bg-indigo-500"
+            >
+              回答する{selectedOptions.length > 0 ? `（${selectedOptions.length}個選択中）` : ''}
+            </Button>
+          )}
+          {answered && (() => {
+            const correctCount = shuffledOptions.filter((o) => o.isCorrect).length;
+            const correctlySelected = selectedOptions.filter((i) => shuffledOptions[i]?.isCorrect).length;
+            const wronglySelected = selectedOptions.filter((i) => !shuffledOptions[i]?.isCorrect).length;
+            const isAllCorrect = correctlySelected === correctCount && wronglySelected === 0;
+            return (
+              <div
+                className={`mt-2 rounded-xl border p-3 text-sm ${
+                  isAllCorrect
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                    : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+                }`}
+              >
+                {isAllCorrect
+                  ? `✅ 正解！${correctCount}つとも選べましたね。次のページへ進みましょう。`
+                  : `❌ 不正解。緑でハイライトされた${correctCount}つが正解です。次のページへ進む前に確認しておきましょう。`}
+              </div>
+            );
+          })()}
         </div>
       )}
 
