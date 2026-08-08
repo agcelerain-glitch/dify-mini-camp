@@ -39,6 +39,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [showHint, setShowHint] = useState(false);
+  const [showHint2, setShowHint2] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isCleared, setIsCleared] = useState(false);
   const [gradingPending, setGradingPending] = useState(false);
@@ -91,6 +92,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
     setChatInput('');
     setChatMessages([]);
     setShowHint(false);
+    setShowHint2(false);
     setIsCleared(false);
     setGradingPending(false);
     setSaveError(false);
@@ -492,6 +494,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                     chatInput={chatInput}
                     chatMessages={chatMessages}
                     showHint={showHint}
+                    showHint2={showHint2}
                     isTyping={isTyping}
                     isCleared={isCleared}
                     gradingPending={gradingPending}
@@ -504,6 +507,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
                     onChatSend={handleChatSend}
                     onSubmitAnswer={handleSubmitAnswer}
                     onToggleHint={() => setShowHint((v) => !v)}
+                    onToggleHint2={() => setShowHint2((v) => !v)}
                   />
                 )}
 
@@ -726,6 +730,7 @@ type OutputProps = {
   chatInput: string;
   chatMessages: { role: 'user' | 'assistant'; text: string }[];
   showHint: boolean;
+  showHint2: boolean;
   isTyping: boolean;
   isCleared: boolean;
   gradingPending: boolean;
@@ -738,6 +743,7 @@ type OutputProps = {
   onChatSend: () => void;
   onSubmitAnswer: () => void;
   onToggleHint: () => void;
+  onToggleHint2: () => void;
 };
 
 function OutputPageContent({
@@ -750,6 +756,7 @@ function OutputPageContent({
   chatInput,
   chatMessages,
   showHint,
+  showHint2,
   isTyping,
   isCleared,
   gradingPending,
@@ -762,8 +769,10 @@ function OutputPageContent({
   onChatSend,
   onSubmitAnswer,
   onToggleHint,
+  onToggleHint2,
 }: OutputProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [chatFocused, setChatFocused] = useState(false);
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isTyping]);
@@ -959,20 +968,33 @@ function OutputPageContent({
           </div>
           {!isCleared && (
             <div className="flex gap-2 items-end">
-              <textarea
-                value={chatInput}
-                onChange={(e) => onChatInputChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !isTyping && !gradingPending) {
-                    e.preventDefault();
-                    onChatSend();
-                  }
-                }}
-                placeholder={page.chatPlaceholder ?? 'メンターに話しかける... (Enterで送信 / Shift+Enterで改行)'}
-                disabled={isTyping || gradingPending}
-                rows={2}
-                className="flex-1 resize-y rounded-xl border border-white/10 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50 min-h-[2.5rem] max-h-48"
-              />
+              {/* フローティングラベル付きテキストエリア */}
+              <div className="relative flex-1">
+                <textarea
+                  value={chatInput}
+                  onChange={(e) => onChatInputChange(e.target.value)}
+                  onFocus={() => setChatFocused(true)}
+                  onBlur={() => setChatFocused(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !isTyping && !gradingPending) {
+                      e.preventDefault();
+                      onChatSend();
+                    }
+                  }}
+                  disabled={isTyping || gradingPending}
+                  rows={2}
+                  className="w-full resize-y rounded-xl border border-white/10 bg-slate-800 px-3 pb-2.5 pt-5 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-50 min-h-[4rem] max-h-48"
+                />
+                <span
+                  className={`pointer-events-none absolute left-3 select-none transition-all duration-200 ease-out ${
+                    chatFocused || chatInput
+                      ? '-top-2 bg-slate-900 px-1 text-[10px] text-indigo-400 rounded'
+                      : 'top-3 text-xs text-slate-500'
+                  }`}
+                >
+                  メンターに話しかける... (Enterで送信 / Shift+Enterで改行)
+                </span>
+              </div>
               <Button
                 onClick={onChatSend}
                 disabled={!chatInput.trim() || isTyping || gradingPending}
@@ -988,6 +1010,9 @@ function OutputPageContent({
             <div className="mt-3 border-t border-white/10 pt-3">
               <p className="mb-2 text-xs text-slate-400">
                 課題を完了したら採点を依頼してください（最後に送ったメッセージが採点対象になります）
+              </p>
+              <p className="mb-2 text-xs text-slate-500">
+                採点されない場合は、もう一度内容を送ってから下のボタンを押してみてください。
               </p>
               <Button
                 onClick={onSubmitAnswer}
@@ -1020,6 +1045,23 @@ function OutputPageContent({
           {showHint && (
             <div className="mt-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-200">
               💡 {page.hint}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ヒント2（ほぼ答え）：chatPlaceholderから移植した例文 */}
+      {page.hint2 && (
+        <div className="mt-3">
+          <button
+            onClick={onToggleHint2}
+            className="text-xs text-orange-500/70 underline hover:text-orange-400"
+          >
+            {showHint2 ? 'ヒント2を隠す ▲' : 'ヒント2（困ったら）を見る ▼'}
+          </button>
+          {showHint2 && (
+            <div className="mt-2 rounded-xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-200">
+              📝 <span className="font-semibold">記入例：</span>{page.hint2}
             </div>
           )}
         </div>
