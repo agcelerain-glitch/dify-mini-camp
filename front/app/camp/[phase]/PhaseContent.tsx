@@ -777,7 +777,7 @@ function OutputPageContent({
             disabled={answered}
             placeholder="ここに回答を入力してください..."
             rows={5}
-            className="w-full resize-none rounded-xl border border-white/10 bg-slate-800 p-4 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
+            className="w-full resize-y rounded-xl border border-white/10 bg-slate-800 p-4 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
           />
           {!answered ? (
             <Button
@@ -835,20 +835,25 @@ function OutputPageContent({
             <div ref={chatEndRef} />
           </div>
           {!isCleared && (
-            <div className="flex gap-2">
-              <input
-                type="text"
+            <div className="flex gap-2 items-end">
+              <textarea
                 value={chatInput}
                 onChange={(e) => onChatInputChange(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !isTyping && !gradingPending && onChatSend()}
-                placeholder="メンターに話しかける... (Enterで送信)"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !isTyping && !gradingPending) {
+                    e.preventDefault();
+                    onChatSend();
+                  }
+                }}
+                placeholder={page.chatPlaceholder ?? 'メンターに話しかける... (Enterで送信 / Shift+Enterで改行)'}
                 disabled={isTyping || gradingPending}
-                className="flex-1 rounded-xl border border-white/10 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50"
+                rows={2}
+                className="flex-1 resize-y rounded-xl border border-white/10 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500 disabled:opacity-50 min-h-[2.5rem] max-h-48"
               />
               <Button
                 onClick={onChatSend}
                 disabled={!chatInput.trim() || isTyping || gradingPending}
-                className="bg-indigo-600 hover:bg-indigo-500"
+                className="bg-indigo-600 hover:bg-indigo-500 shrink-0"
               >
                 送信
               </Button>
