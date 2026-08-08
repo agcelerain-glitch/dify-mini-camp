@@ -2293,10 +2293,18 @@ Difyワークフロー内でも環境変数を使えます:
         {
           id: 4,
           type: 'output',
-          title: '記述問題：環境変数の問題点を発見せよ',
-          question: '以下のコードを見て、セキュリティ上の問題点を指摘してください。\n\n```typescript\n// front/app/api/chat/route.ts\nconst DIFY_KEY = "app-abc123xyz456";\nexport async function POST(req: Request) {\n  const res = await fetch("https://api.dify.ai/v1/chat-messages", {\n    headers: { "Authorization": `Bearer ${DIFY_KEY}` }\n  });\n  return Response.json(await res.json());\n}\n```\n\n① 何が問題ですか？具体的なリスクを説明してください。\n② どう修正すれば安全になりますか？',
-          format: 'short-answer',
-          hint: 'APIキーをコードに直書きすると、GitHubにpushした際に何が起きるでしょうか？修正には環境変数を活用します。',
+          title: '問題発見クイズ：ソースコードへのAPIキー直書き（複数選択）',
+          question: '以下のコードにおけるセキュリティ上の問題の説明として、**正しいものを2つ**選んでください。\n\n```typescript\n// front/app/api/chat/route.ts\nconst DIFY_KEY = "app-abc123xyz456";\nexport async function POST(req: Request) {\n  const res = await fetch("https://api.dify.ai/v1/chat-messages", {\n    headers: { "Authorization": `Bearer ${DIFY_KEY}` }\n  });\n  return Response.json(await res.json());\n}\n```',
+          format: 'multi-select',
+          options: [
+            { label: 'APIキーがソースコードに直書きされているため、GitHubにpushすると誰でもリポジトリを閲覧してキーを悪用できる', isCorrect: true },
+            { label: '一度gitにコミットするとAPIキーは履歴として永続的に残り、後からファイルを削除してもgit logで取得できてしまう', isCorrect: true },
+            { label: 'API Routeのコードはビルド時にクライアントバンドルにも含まれるため、DIFY_KEYがDevToolsのSourcesタブから閲覧できる', isCorrect: false },
+            { label: 'fetch()のURLがコードに直書きされているため、DifyのAPIエンドポイントが変更されると不正アクセスが発生する', isCorrect: false },
+            { label: 'NEXT_PUBLIC_プレフィックスがないため、この変数はVercelのEnvironment Variablesに登録できない', isCorrect: false },
+            { label: 'POST関数をexportしているため、関数スコープ外のDIFY_KEY定数がクライアントから直接参照できる', isCorrect: false },
+          ],
+          hint: 'APIキーをコードに直書きする最大のリスクは「ソースコード管理経由の漏洩」です。GitHubにpushした瞬間と、一度コミットした後の取り消し不可能な履歴の2点を考えてみましょう。',
         },
         {
           id: 5,
