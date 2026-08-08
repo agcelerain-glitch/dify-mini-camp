@@ -7,6 +7,35 @@
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] - 2026-08-08
+
+### Added
+- **Phase 3 Level 1: 変数集約器ページ新規追加**（id:7、表示P3）— Variable Aggregator の役割・パイプライン図・接続手順を解説
+- **Phase 3 Level 1 P5: マルチセレクト形式に変更** — 6択から正しいものを2つ選ぶ形式（クラス分類クイズ）。選択・未選択・誤選択を色分けフィードバック
+- **Phase 4 Level 1 P2: ナレッジ作成手順を刷新** — 「ホーム→スタジオ→ナレッジ」のサイドバー案内、右上「＋作成」→「すぐに使えるナレッジベースを作成」→ `.txt` アップロード→プロジェクト名設定の手順に更新
+- **Phase 4 Level 1: ナレッジ設定タブ詳細ページ新規追加**（id:7、表示P3）— 内部4タブ（ドキュメント・パイプライン・検索テスト・設定）の説明、設定タブ全項目の表形式解説（チャンク構造・インデックス方法・埋め込みモデルエラー対処・トップK・スコア閾値）
+- **Phase 4 Level 1 P5: マルチセレクト形式に変更** — RAGとナレッジ設定の正誤判断（6択・正解2つ）
+- **採点ルーブリック追加** — `other/_code_rubric_choice.txt` に Phase 3（3-1・3-2）・Phase 4（4-1・4-2）を追記
+- **CLAUDE.md: コンテンツ追加ルール**セクション追加 — ID採番ルール・堅牢化ロジック変更禁止事項・コミット前チェックリスト
+- **phases-data.ts: 全フェーズの ID 採番管理テーブル**をファイル冒頭コメントに追加 — 使用済みID一覧と次回採番IDを明示
+
+### Changed
+- **Phase 3 Level 2**: IF/ELSE サンプルとブロック名例をクレーム対応Bot テーマに統一（旧: Dify mini Camp 固有例）
+- **Phase 3 Level 2**: キャンバス操作のキーボードショートカット表に `H`（ハンド）・`V`（ポインター）・マウスホイール長押し・`Ctrl+O`（ノード整理）を追加
+
+### Fixed
+- **全体進捗計算をページ単位に変更** — `ProgressContext` / `home/page.tsx` / `camp/page.tsx` のすべてでフェーズクリア数ベース→全ページID照合方式に統一
+- **home/page.tsx 分数表記修正** — 「X / 5 フェーズ完了」→「XX / YY ページ完了」
+- **`isPageUnlocked`**: クリア済みページは `clearedAt` に関係なく常にアンロック（コンテンツ途中挿入後の誤ロック防止）
+- **`isLevelUnlocked`**: クリア済みレベルは常にアンロック、さらに `currentPhase > phaseId` の場合は全レベルを解放（`level_cleared_at` DB不整合によるロックバグ修正）
+- **`getLevelProgress` / `getPhaseProgress`**: `clearedPages.length` ベース→ページID照合方式に変更（ID非連続・途中挿入でも正確）
+- **PhaseContent.tsx ページ番号表示**: `page.id` → 配列インデックス+1 に統一（サイドバー・タブバー・パンくず・ページヘッダー4箇所）
+- **Phase 3 L1→L2 遷移**: `goToLevel(currentLevelId + 1)` → `nextLevel.id`（配列インデックスベース）に修正し、ID非連続でも正しく遷移
+- **`completeLevel` ページループ**: 連番ID仮定 → `level.pages.forEach(page => ...)` に修正
+- **Phase 3 Level 1 ページID整合性**: 変数集約器ページに新規ID(7) を割り当て、既存ページのID(3・4・5) を保持してDB `clearedPages` との整合性を維持
+
 ### Added
 - 全コードブロックにコピーボタン（`CopyableCodeBlock` コンポーネント）を追加 — クリックで内容をクリップボードへコピー、2秒後に「コピー」表示に戻る
 - **選択肢のランダムシャッフル** — 全フェーズ・全レベルの選択式クイズで、ページ切替・レベル切替・リロードのたびに選択肢の並び順をランダム化。`useMemo([currentPageIndex, currentLevelId])` で制御し、正解が常に1番目に固定されるマンネリを解消
