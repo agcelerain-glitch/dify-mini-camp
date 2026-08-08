@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 
 export default function CampPage() {
   const { user, isLoading } = useAuth();
-  const { isPhaseCleared, isLevelCleared, isPhaseUnlocked, isLevelUnlocked, isPageCleared, progress } = useProgress();
+  const { isPhaseUnlocked, isLevelUnlocked, isPageCleared, progress } = useProgress();
   const router = useRouter();
 
   useEffect(() => {
@@ -57,7 +57,6 @@ export default function CampPage() {
 
         <div className="space-y-6">
           {PHASES.map((phase) => {
-            const cleared = isPhaseCleared(phase.id);
             const unlocked = isPhaseUnlocked(phase.id);
             const isCurrent = phase.id === progress.currentPhase;
             const pct = getPhaseProgress(phase.id);
@@ -84,7 +83,7 @@ export default function CampPage() {
                 <div className="p-5">
                   <div className="flex flex-wrap items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-2xl ${!unlocked ? 'grayscale' : ''}`}>
-                      {!unlocked ? '🔒' : cleared ? '✅' : phase.icon}
+                      {!unlocked ? '🔒' : pct === 100 ? '✅' : phase.icon}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -109,7 +108,6 @@ export default function CampPage() {
                           {/* レベル一覧 */}
                           <div className="mt-3 grid gap-2 sm:grid-cols-2">
                             {phase.levels.map((level) => {
-                              const lCleared = isLevelCleared(phase.id, level.id);
                               const lUnlocked = isLevelUnlocked(phase.id, level.id);
                               const lCurrent = level.id === currentLevel && isCurrent;
                               const levelClearedPages =
@@ -124,7 +122,7 @@ export default function CampPage() {
                                   key={level.id}
                                   href={`/camp/${phase.id}?level=${level.id}`}
                                   className={`rounded-xl border p-3 transition-colors hover:bg-slate-800 ${
-                                    lCleared
+                                    levelPct === 100
                                       ? 'border-emerald-500/30 bg-emerald-500/5'
                                       : lCurrent
                                       ? `${phase.borderColor} bg-slate-800/50`
@@ -135,7 +133,7 @@ export default function CampPage() {
                                     <span className={`text-xs font-bold ${lCurrent ? phase.textColor : 'text-slate-500'}`}>
                                       Level {level.id}
                                     </span>
-                                    {lCleared && <span className="ml-auto text-xs">✅</span>}
+                                    {levelPct === 100 && <span className="ml-auto text-xs">✅</span>}
                                   </div>
                                   <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{level.title}</p>
                                   <div className="mt-2">

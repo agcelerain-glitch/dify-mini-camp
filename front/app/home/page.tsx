@@ -138,7 +138,6 @@ export default function HomePage() {
           <h3 className="mb-4 text-lg font-semibold text-white">学習ロードマップ</h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PHASES.map((phase) => {
-              const cleared = isPhaseCleared(phase.id);
               const unlocked = isPhaseUnlocked(phase.id);
               const isCurrent = phase.id === currentPhase;
               const pct = getPhaseProgress(phase.id);
@@ -149,7 +148,7 @@ export default function HomePage() {
                 } ${unlocked ? 'bg-slate-900 hover:bg-slate-800 cursor-pointer' : 'bg-slate-900/50 opacity-60 cursor-not-allowed'} ${
                   isCurrent && unlocked ? 'ring-1 ring-indigo-500/50' : ''
                 }`}>
-                  {cleared && <span className="absolute right-3 top-3 text-lg">✅</span>}
+                  {pct === 100 && <span className="absolute right-3 top-3 text-lg">✅</span>}
                   {!unlocked && <span className="absolute right-3 top-3 text-lg">🔒</span>}
                   <p className="mb-1 text-xs text-slate-500">{phase.subtitle}</p>
                   <p className="font-semibold text-white">
