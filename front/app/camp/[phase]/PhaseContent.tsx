@@ -820,6 +820,12 @@ function OutputPageContent({
                 : `❌ 不正解。正解は「${shuffledOptions.find((o) => o.isCorrect)?.label}」です。もう一度復習してから次へ進みましょう。`}
             </div>
           )}
+          {answered && page.explanation && (
+            <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 text-sm text-sky-200 whitespace-pre-line">
+              <p className="mb-2 font-semibold text-sky-300">📖 解説</p>
+              {page.explanation}
+            </div>
+          )}
         </div>
       )}
 
@@ -884,17 +890,25 @@ function OutputPageContent({
             const wronglySelected = selectedOptions.filter((i) => !shuffledOptions[i]?.isCorrect).length;
             const isAllCorrect = correctlySelected === correctCount && wronglySelected === 0;
             return (
-              <div
-                className={`mt-2 rounded-xl border p-3 text-sm ${
-                  isAllCorrect
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                    : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
-                }`}
-              >
-                {isAllCorrect
-                  ? `✅ 正解！${correctCount}つとも選べましたね。次のページへ進みましょう。`
-                  : `❌ 不正解。緑でハイライトされた${correctCount}つが正解です。次のページへ進む前に確認しておきましょう。`}
-              </div>
+              <>
+                <div
+                  className={`mt-2 rounded-xl border p-3 text-sm ${
+                    isAllCorrect
+                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                      : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+                  }`}
+                >
+                  {isAllCorrect
+                    ? `✅ 正解！${correctCount}つとも選べましたね。次のページへ進みましょう。`
+                    : `❌ 不正解。緑でハイライトされた${correctCount}つが正解です。次のページへ進む前に確認しておきましょう。`}
+                </div>
+                {page.explanation && (
+                  <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 text-sm text-sky-200 whitespace-pre-line">
+                    <p className="mb-2 font-semibold text-sky-300">📖 解説</p>
+                    {page.explanation}
+                  </div>
+                )}
+              </>
             );
           })()}
         </div>
