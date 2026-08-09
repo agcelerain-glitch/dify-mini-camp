@@ -1,7 +1,33 @@
 import { use } from 'react';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { getPhase } from '@/lib/phases-data';
 import { PhaseContent } from './PhaseContent';
+
+export async function generateMetadata(
+  props: PageProps<'/camp/[phase]'>,
+): Promise<Metadata> {
+  const { phase: phaseParam } = await props.params;
+  const phaseId = parseInt(phaseParam, 10);
+  const phase = getPhase(phaseId);
+  if (!phase) return {};
+
+  const title = `Phase ${phaseId}: ${phase.title}`;
+  const description = `${phase.description} — Dify mini Campの${phase.difficultyLabel}コース。${phase.duration}で学べる実践ハンズオン。`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+    },
+    twitter: {
+      title,
+      description,
+    },
+  };
+}
 
 export default function PhasePage(props: PageProps<'/camp/[phase]'>) {
   const { phase: phaseParam } = use(props.params);

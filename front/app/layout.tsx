@@ -14,11 +14,40 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const SITE_URL = 'https://dify-minicamp.vercel.app';
+const SITE_TITLE = 'Dify mini Camp — AIワークフローを学ぶ学習プラットフォーム';
+const SITE_DESCRIPTION =
+  'Difyの学習をDifyを使って行う。AIメンター付き5段階フェーズ学習プラットフォーム。初心者から中上級者まで、実践的なハンズオンでDifyをマスターしよう。';
+
 export const metadata: Metadata = {
-  title: 'Dify mini Camp — AIワークフローを学ぶ学習プラットフォーム',
-  description:
-    'Difyの学習をDifyを使って行う。AIメンター付き5段階フェーズ学習プラットフォーム。初心者から中上級者まで、実践的なハンズオンでDifyをマスターしよう。',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: '%s | Dify mini Camp',
+  },
+  description: SITE_DESCRIPTION,
   manifest: '/manifest.json',
+  openGraph: {
+    type: 'website',
+    locale: 'ja_JP',
+    url: SITE_URL,
+    siteName: 'Dify mini Camp',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
   icons: {
     icon: [
       { url: '/favicon.ico' },
