@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProgress } from '@/contexts/ProgressContext';
+import { Star } from 'lucide-react';
 import { Phase, Level, InputPage, OutputPage, Page, PHASES } from '@/lib/phases-data';
 import { Navbar } from '@/components/Navbar';
 import { ChatbotButton } from '@/components/ChatbotButton';
@@ -14,15 +15,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
-type Props = { phase: Phase; initialLevel?: number };
+type Props = { phase: Phase; initialLevel?: number; initialPageId?: number };
 
-export function PhaseContent({ phase, initialLevel = 1 }: Props) {
+export function PhaseContent({ phase, initialLevel = 1, initialPageId = 0 }: Props) {
   const { user, isLoading } = useAuth();
-  const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, isPageUnlocked, getPhaseProgress, getLevelProgress, completePage, completeLevel } = useProgress();
+  const { progress, isProgressLoading, isPhaseUnlocked, isLevelUnlocked, isLevelCleared, isPageCleared, isPageUnlocked, getPhaseProgress, getLevelProgress, completePage, completeLevel, isFavorited, toggleFavorite } = useProgress();
   const router = useRouter();
 
   const [currentLevelId, setCurrentLevelId] = useState(initialLevel);
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const initialLevel0 = phase.levels.find((l) => l.id === initialLevel) ?? phase.levels[0];
+  const initialIndex = initialPageId > 0
+    ? Math.max(0, initialLevel0.pages.findIndex((p) => p.id === initialPageId))
+    : 0;
+  const [currentPageIndex, setCurrentPageIndex] = useState(initialIndex);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // ページ/レベル切替時にスクロールトップ
@@ -509,11 +514,25 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
             <div className={`rounded-2xl border ${phase.borderColor} bg-slate-900`}>
               {/* ページヘッダー */}
               <div className={`border-b ${phase.borderColor} px-6 py-4 bg-gradient-to-r ${phase.bgGradient}`}>
-                <div className="flex items-center gap-2">
-                  <Badge className={`text-xs ${phase.badgeBg}`}>
-                    {currentPage.type === 'input' ? '📖 インプット' : '✏️ アウトプット'}
-                  </Badge>
-                  <span className="text-xs text-slate-500">ページ {currentPageIndex + 1} / {totalPages}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge className={`text-xs ${phase.badgeBg}`}>
+                      {currentPage.type === 'input' ? '📖 インプット' : '✏️ アウトプット'}
+                    </Badge>
+                    <span className="text-xs text-slate-500">ページ {currentPageIndex + 1} / {totalPages}</span>
+                  </div>
+                  <button
+                    onClick={() => toggleFavorite(phase.id, currentLevelId, currentPage.id)}
+                    title={isFavorited(phase.id, currentLevelId, currentPage.id) ? 'お気に入り解除' : 'お気に入りに追加'}
+                    className="rounded-lg p-1.5 transition-colors hover:bg-white/10"
+                  >
+                    <Star
+                      size={18}
+                      className={isFavorited(phase.id, currentLevelId, currentPage.id)
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'text-slate-500'}
+                    />
+                  </button>
                 </div>
                 <h3 className="mt-2 text-xl font-bold text-white">{currentPage.title}</h3>
               </div>

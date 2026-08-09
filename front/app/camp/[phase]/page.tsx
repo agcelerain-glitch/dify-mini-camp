@@ -19,5 +19,8 @@ export default function PhasePage(props: PageProps<'/camp/[phase]'>) {
   const parsedLevel = parseInt(typeof levelParam === 'string' ? levelParam : '1', 10);
   const initialLevel = phase.levels.find((l) => l.id === parsedLevel) ? parsedLevel : 1;
 
-  return <PhaseContent phase={phase} initialLevel={initialLevel} />;
+  const pageParam = searchParams?.page;
+  const initialPageId = parseInt(typeof pageParam === 'string' ? pageParam : '0', 10);
+
+  return <PhaseContent phase={phase} initialLevel={initialLevel} initialPageId={initialPageId} />;
 }

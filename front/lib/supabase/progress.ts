@@ -1,6 +1,12 @@
 import { createClient } from './client';
 import type { UserProgress, PhaseProgress, LevelProgress } from '@/lib/mock-store';
 
+export type FavoriteItem = {
+  phaseId: number;
+  levelId: number;
+  pageId: number;
+};
+
 function makeDefaultLevel(): LevelProgress {
   return { currentPage: 1, clearedPages: [] };
 }
@@ -119,4 +125,47 @@ export async function deleteUserProgress(userId: string): Promise<void> {
     supabase.from('progress').delete().eq('user_id', userId),
     supabase.from('user_state').delete().eq('user_id', userId),
   ]);
+}
+
+export async function fetchFavorites(userId: string): Promise<FavoriteItem[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('favorites')
+    .select('phase_id, level_id, page_id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+  return (data ?? []).map((row) => ({
+    phaseId: row.phase_id as number,
+    levelId: row.level_id as number,
+    pageId: row.page_id as number,
+  }));
+}
+
+export async function addFavorite(
+  userId: string,
+  phaseId: number,
+  levelId: number,
+  pageId: number,
+): Promise<void> {
+  const supabase = createClient();
+  await supabase.from('favorites').upsert(
+    { user_id: userId, phase_id: phaseId, level_id: levelId, page_id: pageId },
+    { onConflict: 'user_id,phase_id,level_id,page_id' },
+  );
+}
+
+export async function removeFavorite(
+  userId: string,
+  phaseId: number,
+  levelId: number,
+  pageId: number,
+): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from('favorites')
+    .delete()
+    .eq('user_id', userId)
+    .eq('phase_id', phaseId)
+    .eq('level_id', levelId)
+    .eq('page_id', pageId);
 }

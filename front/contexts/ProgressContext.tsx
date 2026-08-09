@@ -10,7 +10,13 @@ import {
   upsertProgress,
   upsertUserState,
   deleteUserProgress,
+  fetchFavorites,
+  addFavorite,
+  removeFavorite,
+  type FavoriteItem,
 } from '@/lib/supabase/progress';
+
+export type { FavoriteItem };
 
 type ProgressContextType = {
   progress: UserProgress;
@@ -28,6 +34,9 @@ type ProgressContextType = {
   completePhase: (phaseId: number) => void;
   resetAll: () => void;
   refreshProgress: () => void;
+  favorites: FavoriteItem[];
+  isFavorited: (phaseId: number, levelId: number, pageId: number) => boolean;
+  toggleFavorite: (phaseId: number, levelId: number, pageId: number) => Promise<void>;
 };
 
 const ProgressContext = createContext<ProgressContextType>(null!);
@@ -36,17 +45,23 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [progress, setProgress] = useState<UserProgress>(structuredClone(DEFAULT_PROGRESS));
   const [isProgressLoading, setIsProgressLoading] = useState(true);
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
 
   const refreshProgress = useCallback(async () => {
     if (!user) {
       setProgress(structuredClone(DEFAULT_PROGRESS));
+      setFavorites([]);
       setIsProgressLoading(false);
       return;
     }
     setIsProgressLoading(true);
     try {
-      const loaded = await fetchUserProgress(user.id);
+      const [loaded, favs] = await Promise.all([
+        fetchUserProgress(user.id),
+        fetchFavorites(user.id),
+      ]);
       setProgress(loaded);
+      setFavorites(favs);
     } catch (e) {
       console.error('進捗の読み込みに失敗しました', e);
     } finally {
@@ -235,6 +250,25 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function isFavorited(phaseId: number, levelId: number, pageId: number): boolean {
+    return favorites.some(
+      (f) => f.phaseId === phaseId && f.levelId === levelId && f.pageId === pageId,
+    );
+  }
+
+  async function toggleFavorite(phaseId: number, levelId: number, pageId: number): Promise<void> {
+    if (!user) return;
+    if (isFavorited(phaseId, levelId, pageId)) {
+      setFavorites((prev) =>
+        prev.filter((f) => !(f.phaseId === phaseId && f.levelId === levelId && f.pageId === pageId)),
+      );
+      await removeFavorite(user.id, phaseId, levelId, pageId);
+    } else {
+      setFavorites((prev) => [...prev, { phaseId, levelId, pageId }]);
+      await addFavorite(user.id, phaseId, levelId, pageId);
+    }
+  }
+
   function resetAll() {
     setProgress(structuredClone(DEFAULT_PROGRESS));
     if (user) {
@@ -260,6 +294,9 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         completePhase,
         resetAll,
         refreshProgress,
+        favorites,
+        isFavorited,
+        toggleFavorite,
       }}
     >
       {children}
