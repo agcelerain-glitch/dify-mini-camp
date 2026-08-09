@@ -81,12 +81,18 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     return isLevelCleared(phaseId, prevLevel.id);
   }
 
-  function isPhaseCleared(phaseId: number): boolean {
-    return !!progress.phases[phaseId]?.clearedAt;
+  function isLevelCleared(phaseId: number, levelId: number): boolean {
+    const phase = PHASES.find((p) => p.id === phaseId);
+    const level = phase?.levels.find((l) => l.id === levelId);
+    if (!level) return false;
+    const clearedPages = progress.phases[phaseId]?.levels[levelId]?.clearedPages ?? [];
+    return level.pages.every((page) => clearedPages.includes(page.id));
   }
 
-  function isLevelCleared(phaseId: number, levelId: number): boolean {
-    return !!progress.phases[phaseId]?.levels[levelId]?.clearedAt;
+  function isPhaseCleared(phaseId: number): boolean {
+    const phase = PHASES.find((p) => p.id === phaseId);
+    if (!phase) return false;
+    return phase.levels.every((level) => isLevelCleared(phaseId, level.id));
   }
 
   function isPageCleared(phaseId: number, levelId: number, pageId: number): boolean {
@@ -170,9 +176,11 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     });
     lv.clearedAt = now;
 
-    const allLevelsCleared = phase?.levels.every(
-      (l) => !!next.phases[phaseId]?.levels[l.id]?.clearedAt,
-    );
+    // clearedAt ではなくページ実績で判定（レベル追加後も正確に動作する）
+    const allLevelsCleared = phase?.levels.every((l) => {
+      const lvCleared = next.phases[phaseId]?.levels[l.id]?.clearedPages ?? [];
+      return l.pages.every((p) => lvCleared.includes(p.id));
+    }) ?? false;
     let phaseClearedAt: string | undefined;
     if (allLevelsCleared) {
       next.phases[phaseId].clearedAt = now;
