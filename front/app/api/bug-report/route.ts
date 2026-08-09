@@ -21,6 +21,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'content is required' }, { status: 400 });
   }
 
+  // レートリミット: 直近1時間に5件以上なら拒否
+  const oneHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+  const { count: recentCount } = await supabase
+    .from('bug_reports')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .gte('created_at', oneHourAgo);
+  if ((recentCount ?? 0) >= 5) {
+    return NextResponse.json(
+      { error: '1時間以内に送信できる報告は5件までです。しばらく経ってから再度お試しください。' },
+      { status: 429 },
+    );
+  }
+
   // Supabase に保存
   const { error: dbError } = await supabase.from('bug_reports').insert({
     user_id: user.id,

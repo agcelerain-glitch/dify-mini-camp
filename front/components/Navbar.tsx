@@ -20,7 +20,7 @@ export function Navbar() {
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [submitError, setSubmitError] = useState(false);
+  const [submitError, setSubmitError] = useState<string | false>(false);
 
   function handleSignOut() {
     signOut();
@@ -50,10 +50,15 @@ export function Navbar() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: subject.trim(), content: content.trim() }),
       });
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        throw Object.assign(new Error('rate_limited'), { userMsg: data.error ?? '送信が多すぎます。しばらく経ってから再度お試しください。' });
+      }
       if (!res.ok) throw new Error('failed');
       setSubmitted(true);
-    } catch {
-      setSubmitError(true);
+    } catch (e: unknown) {
+      const msg = (e instanceof Error && (e as Error & { userMsg?: string }).userMsg) || '送信に失敗しました。もう一度お試しください。';
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -211,7 +216,7 @@ export function Navbar() {
                 </div>
 
                 {submitError && (
-                  <p className="mb-3 text-xs text-rose-400">送信に失敗しました。もう一度お試しください。</p>
+                  <p className="mb-3 text-xs text-rose-400">{submitError}</p>
                 )}
 
                 <div className="flex gap-2">

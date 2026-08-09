@@ -21,8 +21,37 @@ export async function POST(request: NextRequest) {
     conversationId,
   } = body;
 
-  if (!message || typeof message !== 'string') {
+  if (!message || typeof message !== 'string' || !message.trim()) {
     return NextResponse.json({ error: 'message is required' }, { status: 400 });
+  }
+  if (message.length > 2000) {
+    return NextResponse.json({ error: 'message too long (max 2000 chars)' }, { status: 400 });
+  }
+
+  // レートリミット: 1分間に30回まで
+  const windowMs = 60_000;
+  const maxReqs = 30;
+  const nowIso = new Date().toISOString();
+  const windowStart = new Date(Date.now() - windowMs).toISOString();
+  const { data: rl } = await supabase
+    .from('api_rate_limits')
+    .select('window_start, req_count')
+    .eq('user_id', user.id)
+    .eq('endpoint', 'dify')
+    .maybeSingle();
+  if (rl && rl.window_start > windowStart) {
+    if (rl.req_count >= maxReqs) {
+      return NextResponse.json({ error: 'Too many requests. Please wait a moment.' }, { status: 429 });
+    }
+    await supabase
+      .from('api_rate_limits')
+      .update({ req_count: rl.req_count + 1 })
+      .eq('user_id', user.id)
+      .eq('endpoint', 'dify');
+  } else {
+    await supabase
+      .from('api_rate_limits')
+      .upsert({ user_id: user.id, endpoint: 'dify', window_start: nowIso, req_count: 1 });
   }
 
   const apiUrl = process.env.DIFY_API_BASE_URL ?? 'https://api.dify.ai/v1';

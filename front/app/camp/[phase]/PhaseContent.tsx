@@ -195,6 +195,13 @@ export function PhaseContent({ phase, initialLevel = 1, initialPageId = 0 }: Pro
           interactionType: isFinalGraduationPage ? 'graduation_chat' : 'question',
         }),
       });
+      if (res.status === 429) {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: 'assistant', text: '送信が多すぎます。少し待ってから再度お試しください。' },
+        ]);
+        return;
+      }
       const data = await res.json();
       const rawReply = data.reply || 'メンターから返答がありませんでした。';
       // DifyがJSON形式で返した場合はfeedback_messageのみ表示
@@ -1088,6 +1095,7 @@ function OutputPageContent({
                   }}
                   disabled={isTyping || gradingPending}
                   rows={2}
+                  maxLength={2000}
                   className="w-full resize-y rounded-xl border border-white/10 bg-slate-800 px-3 pb-2.5 pt-5 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-50 min-h-[4rem] max-h-48"
                 />
                 <span
