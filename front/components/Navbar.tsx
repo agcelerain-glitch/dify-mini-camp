@@ -3,16 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bug, X } from 'lucide-react';
+import { Bug, X, NotebookPen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { NotesModal } from '@/components/NotesModal';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
 
+  const [showNotes, setShowNotes] = useState(false);
   const [showBugReport, setShowBugReport] = useState(false);
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
@@ -88,7 +90,19 @@ export function Navbar() {
                 </Link>
               ))}
 
-              {/* バグ報告ボタン（キャンプの右隣） */}
+              {/* メモボタン（キャンプの右隣） */}
+              {user && (
+                <button
+                  onClick={() => setShowNotes(true)}
+                  title="ノート・メモを開く"
+                  className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-white"
+                >
+                  <NotebookPen size={14} />
+                  <span>メモ</span>
+                </button>
+              )}
+
+              {/* バグ報告ボタン（メモの右隣） */}
               {user && (
                 <button
                   onClick={openBugReport}
@@ -122,6 +136,9 @@ export function Navbar() {
           </div>
         </div>
       </nav>
+
+      {/* メモモーダル */}
+      <NotesModal open={showNotes} onClose={() => setShowNotes(false)} />
 
       {/* バグ報告モーダル */}
       {showBugReport && (
