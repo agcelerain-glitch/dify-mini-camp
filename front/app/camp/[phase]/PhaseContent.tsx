@@ -187,7 +187,7 @@ export function PhaseContent({ phase, initialLevel = 1 }: Props) {
           phase: phase.id,
           levelId: currentLevelId,
           pageId: currentPage.id,
-          interactionType: 'question',
+          interactionType: isFinalGraduationPage ? 'graduation_chat' : 'question',
         }),
       });
       const data = await res.json();
