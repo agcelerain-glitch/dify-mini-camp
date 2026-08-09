@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,6 +16,7 @@ export default function HomePage() {
   const { user, isLoading } = useAuth();
   const { progress, isPhaseCleared, isPhaseUnlocked, isPageCleared, getPhaseProgress, resetAll } = useProgress();
   const router = useRouter();
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.replace('/');
@@ -197,14 +198,36 @@ export default function HomePage() {
                 キャンプへ
               </Button>
             </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetAll}
-              className="text-xs text-slate-700 hover:text-slate-400"
-            >
-              進捗リセット（テスト用）
-            </Button>
+            {showResetConfirm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">本当に全進捗をリセットしますか？</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { resetAll(); setShowResetConfirm(false); }}
+                  className="text-xs text-rose-500 hover:text-rose-400"
+                >
+                  リセットする
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowResetConfirm(false)}
+                  className="text-xs text-slate-500 hover:text-slate-300"
+                >
+                  キャンセル
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowResetConfirm(true)}
+                className="text-xs text-slate-600 hover:text-slate-400"
+              >
+                進捗リセット
+              </Button>
+            )}
           </div>
         </div>
       </main>

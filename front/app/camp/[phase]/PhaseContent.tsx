@@ -897,9 +897,11 @@ function OutputPageContent({
       {/* 複数選択 */}
       {page.format === 'multi-select' && shuffledOptions.length > 0 && (
         <div className="space-y-2.5">
-          <p className="text-xs text-slate-400">
-            正しいものを {shuffledOptions.filter((o) => o.isCorrect).length} つ選んでください
-          </p>
+          {!page.question.includes('すべて') && !page.question.includes('全て') && (
+            <p className="text-xs text-slate-400">
+              正しいものを {shuffledOptions.filter((o) => o.isCorrect).length} つ選んでください
+            </p>
+          )}
           {shuffledOptions.map((opt, idx) => {
             const isSelected = selectedOptions.includes(idx);
             let cls = 'w-full rounded-xl border p-4 text-left text-sm transition-all flex items-start gap-3 ';
@@ -954,6 +956,7 @@ function OutputPageContent({
             const correctlySelected = selectedOptions.filter((i) => shuffledOptions[i]?.isCorrect).length;
             const wronglySelected = selectedOptions.filter((i) => !shuffledOptions[i]?.isCorrect).length;
             const isAllCorrect = correctlySelected === correctCount && wronglySelected === 0;
+            const isAllType = page.question.includes('すべて') || page.question.includes('全て');
             return (
               <>
                 <div
@@ -964,8 +967,12 @@ function OutputPageContent({
                   }`}
                 >
                   {isAllCorrect
-                    ? `✅ 正解！${correctCount}つとも選べましたね。次のページへ進みましょう。`
-                    : `❌ 不正解。緑でハイライトされた${correctCount}つが正解です。次のページへ進む前に確認しておきましょう。`}
+                    ? isAllType
+                      ? '✅ 正解！すべて正しく選べましたね。次のページへ進みましょう。'
+                      : `✅ 正解！${correctCount}つとも選べましたね。次のページへ進みましょう。`
+                    : isAllType
+                      ? '❌ 不正解。緑でハイライトされた選択肢がすべて正解です。次のページへ進む前に確認しておきましょう。'
+                      : `❌ 不正解。緑でハイライトされた${correctCount}つが正解です。次のページへ進む前に確認しておきましょう。`}
                 </div>
                 {page.explanation && (
                   <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 text-sm text-sky-200 whitespace-pre-line">
