@@ -91,14 +91,34 @@
    - テスト3ケース実施後に「公開する」
  STEP D: Vercel 再デプロイ確認
 
+■ バグ修正（追加）: isMaster が false になる問題
+
+ 【原因】isLevelCleared・isPhaseCleared が clearedAt タイムスタンプに依存していた。
+   レベル追加後・旧バージョン完了時に clearedAt が欠落し、100%でも黄色バナーが出ない。
+ 【修正】ProgressContext.tsx の3箇所をページ実績（clearedPages ID照合）ベースに統一:
+   - isLevelCleared: 全ページが clearedPages にあるかを確認
+   - isPhaseCleared: isLevelCleared を全レベルに適用
+   - completeLevel 内 allLevelsCleared: 同じページ照合方式に変更
+ 【効果】将来のレベル追加後もisMasterとバナーが正しく機能する
+
+■ UI 改善（追加）
+
+ [multi-select 問題の正解数ヒント]
+  ・問題文に「すべて」「全て」が含まれるとき「N つ選んでください」を非表示
+  ・回答フィードバックも「すべて正しく選べましたね」等の表記に変更
+  ・「2つ選んでください」型の問題は従来通り数を表示
+
+ [進捗リセットボタン]
+  ・「進捗リセット（テスト用）」→「進捗リセット」（テスト用表記削除）
+  ・クリック後に確認プロンプト＋「リセットする（赤）」「キャンセル」の2段階確認
+
 ■ 未確認・継続事項
 
- ? ホームのフェーズカードを pct===100 のとき黄色にする仕様の是非（要確認）
-   → 現状は ✅ アイコン + 「復習する」ボタン（グレー）のみ
+ ? ホームのフェーズカードを pct===100 のとき黄色にする仕様の是非（追加実装なしで確定）
  ? STEP A〜C 完了後の動作確認（未実施）
- ? 全フェーズクリア時のホーム黄色バナー（home/page.tsx isMaster）は健在
 
 ■ コミット
  b7e7d68  fix: 最終ページのgraduation_chat分類誤り修正・todo04.txt更新（IF/ELSE②）
-          （以前コミット群も含む: P5コンテンツ拡充・feedback機能実装）
+ 49b8d00  fix: isLevelCleared/isPhaseCleared/allLevelsCleared をページ実績ベースに変更
+ 696c27b  feat: multi-select「全て」系は正解数ヒントを非表示・リセットボタン2重確認化
 ===========================================================
