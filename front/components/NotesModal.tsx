@@ -98,7 +98,6 @@ export function NotesModal({ open, onClose }: Props) {
         if (!res.ok) throw new Error();
         const created: Note = await res.json();
         setNotes((prev) => [created, ...prev]);
-        setSelectedId(created.id);
       } else if (selectedId) {
         const res = await fetch(`/api/notes/${selectedId}`, {
           method: 'PATCH',
@@ -109,6 +108,9 @@ export function NotesModal({ open, onClose }: Props) {
         const updated: Note = await res.json();
         setNotes((prev) => [updated, ...prev.filter((n) => n.id !== updated.id)]);
       }
+      // 保存成功 → 選択解除して一覧表示に戻る
+      setSelectedId(null);
+      setMobileView('list');
     } catch {
       setSaveError(true);
     } finally {
@@ -281,7 +283,12 @@ export function NotesModal({ open, onClose }: Props) {
               {/* フッター */}
               <div className="border-t border-white/10 px-4 py-3">
                 {saveError && (
-                  <p className="mb-2 text-xs text-rose-400">保存に失敗しました。もう一度お試しください。</p>
+                  <div className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                    <p className="font-semibold">保存に失敗しました。</p>
+                    <p className="mt-0.5 text-rose-400">
+                      内容を別の場所（メモ帳など）にコピーしてから、画面を閉じてください。
+                    </p>
+                  </div>
                 )}
                 <div className="flex items-center gap-2">
                   {selectedId !== 'new' && (
