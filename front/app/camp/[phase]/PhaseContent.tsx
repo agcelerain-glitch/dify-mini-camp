@@ -462,7 +462,7 @@ export function PhaseContent({ phase, initialLevel = 1, initialPageId = 0 }: Pro
 
           <div className="mx-auto max-w-3xl px-4 py-6">
             {/* パンくず */}
-            <div className="mb-4 flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="mb-4 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
               <Link href="/camp" className="hover:text-slate-300">キャンプ</Link>
               <span>/</span>
               <span>{phase.subtitle}</span>
@@ -1042,7 +1042,7 @@ function OutputPageContent({
       {/* チャット */}
       {page.format === 'chat' && (
         <div>
-          <div className="mb-3 h-56 overflow-y-auto rounded-xl border border-white/10 bg-slate-800 p-3 space-y-2">
+          <div className="mb-3 h-48 overflow-y-auto rounded-xl border border-white/10 bg-slate-800 p-3 space-y-2 sm:h-56">
             {chatMessages.length === 0 && (
               <div className="flex h-full items-center justify-center">
                 <p className="text-xs text-slate-600">AIメンターに話しかけてみましょう</p>

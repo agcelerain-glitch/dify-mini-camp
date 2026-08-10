@@ -101,6 +101,25 @@ export default function CampPage() {
               const pct = getPhaseProgress(phase.id);
               const currentLevel = progress.phases[phase.id]?.currentLevel ?? 1;
 
+              // ボタンをデスクトップ右・モバイルコンテンツ下の両方で再利用
+              const phaseBtn = unlocked ? (
+                <Link href={`/camp/${phase.id}`} className="block w-full sm:w-auto">
+                  <Button
+                    className={`w-full sm:w-auto ${
+                      pct === 100
+                        ? 'bg-slate-700 hover:bg-slate-600'
+                        : 'bg-indigo-600 hover:bg-indigo-500'
+                    }`}
+                  >
+                    {pct === 100 ? '復習する' : isCurrent ? '続ける →' : '始める →'}
+                  </Button>
+                </Link>
+              ) : (
+                <Button disabled className="w-full sm:w-auto bg-slate-800 text-slate-600 cursor-not-allowed">
+                  🔒 ロック中
+                </Button>
+              );
+
               return (
                 <div
                   key={phase.id}
@@ -120,8 +139,8 @@ export default function CampPage() {
                   )}
 
                   <div className="p-5">
-                    <div className="flex flex-wrap items-start gap-4">
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-2xl ${!unlocked ? 'grayscale' : ''}`}>
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-2xl ${!unlocked ? 'grayscale' : ''}`}>
                         {!unlocked ? '🔒' : pct === 100 ? '✅' : phase.icon}
                       </div>
 
@@ -203,27 +222,13 @@ export default function CampPage() {
                             </div>
                           </>
                         )}
+
+                        {/* モバイル: コンテンツ下に全幅ボタン */}
+                        <div className="mt-3 sm:hidden">{phaseBtn}</div>
                       </div>
 
-                      <div className="shrink-0">
-                        {unlocked ? (
-                          <Link href={`/camp/${phase.id}`}>
-                            <Button
-                              className={
-                                pct === 100
-                                  ? 'bg-slate-700 hover:bg-slate-600'
-                                  : 'bg-indigo-600 hover:bg-indigo-500'
-                              }
-                            >
-                              {pct === 100 ? '復習する' : isCurrent ? '続ける →' : '始める →'}
-                            </Button>
-                          </Link>
-                        ) : (
-                          <Button disabled className="bg-slate-800 text-slate-600 cursor-not-allowed">
-                            🔒 ロック中
-                          </Button>
-                        )}
-                      </div>
+                      {/* デスクトップ: 右側ボタン */}
+                      <div className="hidden shrink-0 sm:block">{phaseBtn}</div>
                     </div>
                   </div>
                 </div>

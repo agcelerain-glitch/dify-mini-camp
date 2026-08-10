@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bug, X, NotebookPen } from 'lucide-react';
+import { Bug, X, NotebookPen, Menu } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ export function Navbar() {
 
   const [showNotes, setShowNotes] = useState(false);
   const [showBugReport, setShowBugReport] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -79,8 +80,9 @@ export function Navbar() {
             </span>
           </Link>
 
-          <div className="flex items-center gap-6">
-            <div className="hidden items-center gap-1 sm:flex">
+          {/* デスクトップ: ナビ + ユーザー情報 */}
+          <div className="hidden items-center gap-6 sm:flex">
+            <div className="flex items-center gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -95,7 +97,6 @@ export function Navbar() {
                 </Link>
               ))}
 
-              {/* メモボタン（キャンプの右隣） */}
               {user && (
                 <button
                   onClick={() => setShowNotes(true)}
@@ -107,7 +108,6 @@ export function Navbar() {
                 </button>
               )}
 
-              {/* バグ報告ボタン（メモの右隣） */}
               {user && (
                 <button
                   onClick={openBugReport}
@@ -127,7 +127,7 @@ export function Navbar() {
                     {user.avatar}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm text-slate-300 sm:inline">{user.name}</span>
+                <span className="text-sm text-slate-300">{user.name}</span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -139,8 +139,116 @@ export function Navbar() {
               </div>
             )}
           </div>
+
+          {/* モバイル: ハンバーガー丸ボタン */}
+          <button
+            onClick={() => setShowMobileMenu(true)}
+            aria-label="メニューを開く"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:hidden"
+          >
+            <Menu size={20} />
+          </button>
         </div>
       </nav>
+
+      {/* モバイルメニュー: 背景オーバーレイ */}
+      <div
+        className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 sm:hidden ${
+          showMobileMenu ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={() => setShowMobileMenu(false)}
+      />
+
+      {/* モバイルメニュー: スライドパネル */}
+      <div
+        className={`fixed bottom-0 right-0 top-0 z-[70] flex w-72 flex-col bg-slate-900 border-l border-white/10 transition-transform duration-300 ease-in-out sm:hidden ${
+          showMobileMenu ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {/* パネルヘッダー */}
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <span className="text-sm font-semibold text-white">メニュー</span>
+          <button
+            onClick={() => setShowMobileMenu(false)}
+            className="rounded-lg p-1.5 text-slate-500 hover:text-slate-300"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col overflow-y-auto">
+          {/* ユーザー情報 */}
+          {user && (
+            <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+              <Avatar className="h-10 w-10 shrink-0">
+                <AvatarFallback className="bg-indigo-600 text-sm text-white">
+                  {user.avatar}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-white">{user.name}</p>
+                <p className="text-xs text-slate-500">学習者</p>
+              </div>
+            </div>
+          )}
+
+          {/* ページリンク */}
+          <div className="px-3 py-4">
+            <p className="mb-2 px-2 text-xs font-medium text-slate-500">ページ</p>
+            <div className="space-y-0.5">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setShowMobileMenu(false)}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    pathname === link.href
+                      ? 'bg-white/10 text-white'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* アクション */}
+          {user && (
+            <div className="px-3 pb-4">
+              <p className="mb-2 px-2 text-xs font-medium text-slate-500">アクション</p>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => { setShowNotes(true); setShowMobileMenu(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                >
+                  <NotebookPen size={16} />
+                  メモ
+                </button>
+                <button
+                  onClick={() => { openBugReport(); setShowMobileMenu(false); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                >
+                  <Bug size={16} />
+                  バグ・不具合を報告
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ログアウト（フッター固定） */}
+        {user && (
+          <div className="border-t border-white/10 px-3 py-4">
+            <button
+              onClick={handleSignOut}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300"
+            >
+              ログアウト
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* メモモーダル */}
       <NotesModal open={showNotes} onClose={() => setShowNotes(false)} />
@@ -152,7 +260,6 @@ export function Navbar() {
           onClick={(e) => { if (e.target === e.currentTarget) closeBugReport(); }}
         >
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            {/* ヘッダー */}
             <div className="mb-5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bug size={18} className="text-rose-400" />
@@ -167,7 +274,6 @@ export function Navbar() {
             </div>
 
             {submitted ? (
-              /* 送信完了 */
               <div className="flex flex-col items-center gap-3 py-6 text-center">
                 <span className="text-3xl">✅</span>
                 <p className="font-semibold text-white">報告を受け付けました</p>
@@ -180,7 +286,6 @@ export function Navbar() {
                 </Button>
               </div>
             ) : (
-              /* 入力フォーム */
               <>
                 <p className="mb-4 text-xs text-slate-500">
                   氏名・メールアドレスは非表示ですが、報告内容と共にシステムに記録されます。

@@ -79,7 +79,7 @@ export default function HomePage() {
             </div>
             <div className="text-right">
               <p className="text-xs text-slate-500">全体進捗</p>
-              <p className="text-3xl font-bold text-white">{totalProgress}%</p>
+              <p className="text-2xl font-bold text-white sm:text-3xl">{totalProgress}%</p>
               <p className="text-xs text-slate-500">{totalCleared} / {totalPages} ページ完了</p>
             </div>
           </div>
@@ -227,7 +227,7 @@ export default function HomePage() {
                 <li><span className="text-slate-300">3. アウトプット</span> — クイズ・チャットで理解を確認（ページクリア）</li>
                 <li><span className="text-slate-300">4. レベルアップ</span> — 全ページクリアで次のレベルへ</li>
               </ol>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Link href="/camp">
                   <Button variant="outline" size="sm" className="border-white/10 text-slate-300 hover:bg-white/5">
                     キャンプへ
