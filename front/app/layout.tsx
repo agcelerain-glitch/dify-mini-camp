@@ -26,6 +26,14 @@ export const metadata: Metadata = {
     template: '%s | Dify mini Camp',
   },
   description: SITE_DESCRIPTION,
+  keywords: [
+    'Dify', 'AIワークフロー', 'LLM', 'ノーコードAI', 'プロンプトエンジニアリング',
+    'RAG', 'AIメンター', '学習プラットフォーム', 'ハンズオン', 'Dify入門',
+    'AIアプリ開発', 'チャットボット作成', 'Dify使い方',
+  ],
+  alternates: {
+    canonical: SITE_URL,
+  },
   manifest: '/manifest.json',
   openGraph: {
     type: 'website',
@@ -62,12 +70,42 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Course',
+  name: 'Dify mini Camp',
+  description: SITE_DESCRIPTION,
+  url: SITE_URL,
+  provider: {
+    '@type': 'Organization',
+    name: 'Dify mini Camp',
+    url: SITE_URL,
+  },
+  educationalLevel: '初級〜上級',
+  inLanguage: 'ja',
+  courseMode: 'online',
+  teaches: 'Dify AIワークフロー, LLM, RAG, プロンプトエンジニアリング',
+  hasCourseInstance: [
+    { '@type': 'CourseInstance', name: 'Phase 1 — LLMの基本とGUI操作', courseMode: 'online' },
+    { '@type': 'CourseInstance', name: 'Phase 2 — 変数とプロンプトエンジニアリング', courseMode: 'online' },
+    { '@type': 'CourseInstance', name: 'Phase 3 — 条件分岐とロジック', courseMode: 'online' },
+    { '@type': 'CourseInstance', name: 'Phase 4 — ナレッジ機能と環境変数', courseMode: 'online' },
+    { '@type': 'CourseInstance', name: 'Phase 5 — オーケストレートと堅牢性', courseMode: 'online' },
+  ],
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="ja"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className="min-h-full bg-slate-950 text-white">
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-LCVT8DNFG8"

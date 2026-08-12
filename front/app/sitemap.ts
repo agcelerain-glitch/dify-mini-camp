@@ -1,11 +1,13 @@
 import type { MetadataRoute } from 'next';
 
+const SITE_URL = 'https://dify-minicamp.vercel.app';
+
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
-      url: 'https://dify-minicamp.vercel.app',
+      url: SITE_URL,
       lastModified: new Date(),
-      changeFrequency: 'monthly',
+      changeFrequency: 'weekly',
       priority: 1,
     },
   ];
