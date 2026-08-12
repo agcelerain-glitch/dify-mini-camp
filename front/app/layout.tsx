@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     'AIアプリ開発', 'チャットボット作成', 'Dify使い方',
   ],
   alternates: {
-    canonical: SITE_URL,
+    canonical: SITE_URL + '/',
   },
   manifest: '/manifest.json',
   openGraph: {
