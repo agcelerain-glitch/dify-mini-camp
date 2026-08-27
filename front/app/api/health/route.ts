@@ -5,19 +5,17 @@ export const runtime = 'nodejs';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
 
-/**
- * Supabase の公式ヘルスエンドポイント /auth/v1/health を叩く。
- * - 認証不要で必ず 200 を返す（DB が停止中なら 503/307 になる）
- * - /rest/v1/ は anon key でも 401 を返すケースがあるため使わない
- * - 307 Temporary Redirect 対策: redirect:'follow' + リトライ
- */
-async function pingSupabase(url: string): Promise<{ ok: boolean; status: number }> {
+// Supabase API ゲートウェイ（Kong）はすべてのパスに apikey を要求するため付与する
+// /auth/v1/health は DB との接続確認を含む軽量エンドポイント（307 対策: redirect:'follow' + リトライ）
+async function pingSupabase(url: string, key: string): Promise<{ ok: boolean; status: number }> {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch(`${url}/auth/v1/health`, {
       method: 'GET',
       redirect: 'follow', // 307 Temporary Redirect を追従
-      // Cache-Control を無効化してキャッシュヒットを防ぐ
-      headers: { 'Cache-Control': 'no-cache' },
+      headers: {
+        apikey: key,
+        'Cache-Control': 'no-cache',
+      },
     });
 
     if (res.ok) {
@@ -50,12 +48,13 @@ export async function GET(request: NextRequest) {
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl) {
+  if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Missing SUPABASE env vars' }, { status: 500 });
   }
 
-  const { ok, status } = await pingSupabase(supabaseUrl);
+  const { ok, status } = await pingSupabase(supabaseUrl, supabaseKey);
 
   if (!ok) {
     console.error(`[health] Supabase ping failed: HTTP ${status}`);
