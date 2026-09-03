@@ -2,6 +2,8 @@
 
 「Difyの学習をDifyを使って行う」AIメンター付き学習プラットフォーム。
 
+https://dify-mini-camp.vercel.app/
+
 ## ディレクトリ構成
 
 ```
